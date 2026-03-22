@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  trades               Trade[]
+  setupTypes           SetupType[]
+  confirmationTypes    ConfirmationType[]
+  setupDescriptions    UserSetupDescription[]
+  researchEntries      ResearchEntry[]
+}
+
+model Trade {
+  id               String    @id @default(cuid())
+  userId           String
+  symbol           String
+  direction        String    // long | short
+  instrumentType   String    // options | futures | stocks
+  risk             Float     // amount at risk
+  rr               Float     // risk:reward ratio (e.g. 2 = 1:2)
+  outcome          String    // win = TP hit, loss = SL hit
+  pnl              Float     // calculated: win ? risk*rr : -risk
+  fees             Float     @default(0)
+  date             DateTime  // trade date
+  marketCondition  String?   // mean_reversion | trend | range | etc
+  notes            String?
+  confirmationNotes String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags              TradeTag[]
+  images            TradeImage[]
+  setups            TradeSetup[]
+  confirmations     TradeConfirmation[]
+}
+
+model TradeTag {
+  id        String   @id @default(cuid())
+  tradeId   String
+  name      String
+
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, name])
+}
+
+model TradeImage {
+  id        String   @id @default(cuid())
+  tradeId   String
+  url       String   // path or base64 for now
+  caption   String?
+
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+}
+
+model SetupType {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  // for user-defined types
+  userId      String?  // null = system, else user-defined
+
+  user              User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades            TradeSetup[]
+  userDescriptions  UserSetupDescription[]
+}
+
+model UserSetupDescription {
+  id           String     @id @default(cuid())
+  userId       String
+  setupTypeId  String
+  description  String     // user's personal notes for this setup (works for system + custom)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  setupType SetupType @relation(fields: [setupTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, setupTypeId])
+}
+
+model ResearchEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  content   String   // markdown / rich text
+  type      String   // note | setup | strategy
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images ResearchImage[]
+}
+
+model ResearchImage {
+  id           String   @id @default(cuid())
+  researchId   String
+  url          String
+  caption      String?
+
+  researchEntry ResearchEntry @relation(fields: [researchId], references: [id], onDelete: Cascade)
+}
+
+model ConfirmationType {
+  id     String   @id @default(cuid())
+  name   String
+  userId String?  // null = system
+
+  user   User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades TradeConfirmation[]
+}
+
+model TradeSetup {
+  tradeId     String
+  setupTypeId String
+  notes       String?
+
+  trade       Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  setupType   SetupType @relation(fields: [setupTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, setupTypeId])
+}
+
+model TradeConfirmation {
+  tradeId           String
+  confirmationTypeId String
+  notes             String?
+
+  trade             Trade           @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  confirmationType  ConfirmationType @relation(fields: [confirmationTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, confirmationTypeId])
+}
