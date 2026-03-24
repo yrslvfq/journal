@@ -15,6 +15,7 @@ const nav = [
   { href: "/dashboard/research", label: { en: "Research", ru: "Ресерч" } },
   { href: "/dashboard/research/gallery", label: { en: "Research Gallery", ru: "Галерея ресерча" } },
   { href: "/dashboard/analytics", label: { en: "Analytics", ru: "Аналитика" } },
+  { href: "/dashboard/daily-recaps", label: { en: "Daily recaps", ru: "Дневные итоги" } },
   { href: "/dashboard/settings", label: { en: "Settings", ru: "Настройки" } },
 ];
 

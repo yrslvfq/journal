@@ -24,6 +24,27 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   propAccount          PropAccount?
   killSwitchPause      KillSwitchPause?
+  dailyRecaps          DailyRecap[]
+}
+
+model DailyRecap {
+  id                 String   @id @default(cuid())
+  userId             String
+  date               DateTime
+  keptLossLimit      Boolean  @default(false)
+  setupsOnly         Boolean  @default(false)
+  noStopMoving       Boolean  @default(false)
+  disciplineScore    Int
+  lessonOfDay        String   @default("")
+  sessionEfficiency  Float?
+  sessionStatus      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
 }
 
 model PasswordResetToken {
@@ -59,6 +80,16 @@ model Trade {
   sleepHours       Float?
   stressLevel      String?   // low | medium | high
   stateMoodTag     String?   // FOMO | Tilt | Calm | custom
+  marketVolatility String?   // low | medium | high
+  sessionType      String?   // trend | range
+  price5mAfter     Float?
+  price15mAfter    Float?
+  price60mAfter    Float?
+  entryPrice       Float?
+  exitPrice        Float?
+  initialTp        Float?
+  initialSl        Float?
+  exitType         String    @default("system") // system | manual
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

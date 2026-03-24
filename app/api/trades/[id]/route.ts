@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { normalizeTagName } from "@/lib/trade-tags";
+import { computeStatedPnl } from "@/lib/trade-pnl";
 
 const updateSchema = z.object({
   symbol: z.string().min(1).optional(),
@@ -24,6 +25,17 @@ const updateSchema = z.object({
   sleepHours: z.number().min(0).max(24).optional().nullable(),
   stressLevel: z.enum(["low", "medium", "high"]).optional().nullable(),
   stateMoodTag: z.string().max(64).optional().nullable(),
+  marketVolatility: z.enum(["low", "medium", "high"]).optional().nullable(),
+  sessionType: z.enum(["trend", "range"]).optional().nullable(),
+  exitType: z.enum(["system", "manual"]).optional(),
+  realizedPnl: z.number().optional().nullable(),
+  entryPrice: z.number().optional().nullable(),
+  exitPrice: z.number().optional().nullable(),
+  initialTp: z.number().optional().nullable(),
+  initialSl: z.number().optional().nullable(),
+  price5mAfter: z.number().optional().nullable(),
+  price15mAfter: z.number().optional().nullable(),
+  price60mAfter: z.number().optional().nullable(),
 });
 
 export async function GET(
@@ -79,12 +91,6 @@ export async function PATCH(
     if (data.risk != null) updateData.risk = data.risk;
     if (data.rr != null) updateData.rr = data.rr;
     if (data.outcome != null) updateData.outcome = data.outcome;
-    if (data.risk != null || data.rr != null || data.outcome != null) {
-      const risk = (data.risk ?? (existing as { risk: number }).risk) as number;
-      const rr = (data.rr ?? (existing as { rr: number }).rr) as number;
-      const outcome = (data.outcome ?? (existing as { outcome: string }).outcome) as string;
-      updateData.pnl = outcome === "win" ? risk * rr : outcome === "loss" ? -risk : 0;
-    }
     if (data.fees != null) updateData.fees = data.fees;
     if (data.date != null) updateData.date = new Date(data.date + "T12:00:00Z");
     if (data.marketCondition !== undefined) updateData.marketCondition = data.marketCondition;
@@ -96,6 +102,41 @@ export async function PATCH(
     if (data.stateMoodTag !== undefined) {
       updateData.stateMoodTag = data.stateMoodTag?.trim() || null;
     }
+    if (data.marketVolatility !== undefined) updateData.marketVolatility = data.marketVolatility;
+    if (data.sessionType !== undefined) updateData.sessionType = data.sessionType;
+    if (data.exitType !== undefined) updateData.exitType = data.exitType;
+    if (data.entryPrice !== undefined) updateData.entryPrice = data.entryPrice;
+    if (data.exitPrice !== undefined) updateData.exitPrice = data.exitPrice;
+    if (data.initialTp !== undefined) updateData.initialTp = data.initialTp;
+    if (data.initialSl !== undefined) updateData.initialSl = data.initialSl;
+    if (data.price5mAfter !== undefined) updateData.price5mAfter = data.price5mAfter;
+    if (data.price15mAfter !== undefined) updateData.price15mAfter = data.price15mAfter;
+    if (data.price60mAfter !== undefined) updateData.price60mAfter = data.price60mAfter;
+
+    const ex = existing as {
+      risk: number;
+      rr: number;
+      outcome: string;
+      exitType?: string | null;
+      pnl: number;
+    };
+    const mergedOutcome = (data.outcome ?? ex.outcome) as "win" | "loss" | "be";
+    const mergedRisk = data.risk ?? ex.risk;
+    const mergedRr = data.rr ?? ex.rr;
+    const mergedExit = (data.exitType ?? ex.exitType ?? "system") as "system" | "manual";
+    const realizedForPnl =
+      mergedExit === "manual"
+        ? data.realizedPnl !== undefined
+          ? (data.realizedPnl ?? ex.pnl)
+          : ex.pnl
+        : undefined;
+    updateData.pnl = computeStatedPnl({
+      outcome: mergedOutcome,
+      risk: mergedRisk,
+      rr: mergedRr,
+      exitType: mergedExit,
+      realizedPnl: realizedForPnl,
+    });
 
     if (data.tags !== undefined) {
       await prisma.tradeTag.deleteMany({ where: { tradeId: id } });

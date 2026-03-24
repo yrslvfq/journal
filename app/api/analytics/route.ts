@@ -11,6 +11,19 @@ import {
   type SleepBandId,
   type TradePsychSlice,
 } from "@/lib/analytics-psych";
+import {
+  buildActivityHeatmap,
+  computeKelly,
+  computeMonteCarlo,
+} from "@/lib/analytics-advanced";
+import {
+  buildVolatilityBuckets,
+  contextualTiltFromBuckets,
+  ghostStopCostUsd,
+  postTradeDriftSeries,
+  type TradeBehaviorSlice,
+} from "@/lib/trader-behavior-analytics";
+import { buildActionableInsights } from "@/lib/actionable-insights";
 
 const SEGMENT_HIGHLIGHT_MIN = 3;
 
@@ -75,7 +88,8 @@ export async function GET(req: Request) {
   const dateFilter: { gte: Date; lte?: Date } = { gte: from };
   if (to) dateFilter.lte = to;
 
-  const trades = await prisma.trade.findMany({
+  const [trades, recapsInPeriod] = await Promise.all([
+    prisma.trade.findMany({
     where: {
       userId: session.user.id,
       date: dateFilter,
@@ -83,11 +97,24 @@ export async function GET(req: Request) {
     select: {
       id: true,
       symbol: true,
+      direction: true,
+      outcome: true,
       pnl: true,
       fees: true,
       risk: true,
+      rr: true,
       date: true,
       instrumentType: true,
+      marketVolatility: true,
+      sessionType: true,
+      exitType: true,
+      entryPrice: true,
+      exitPrice: true,
+      initialTp: true,
+      initialSl: true,
+      price5mAfter: true,
+      price15mAfter: true,
+      price60mAfter: true,
       tags: { select: { name: true } },
       setups: { include: { setupType: true } },
       confirmations: { include: { confirmationType: true } },
@@ -97,7 +124,34 @@ export async function GET(req: Request) {
       stateMoodTag: true,
     },
     orderBy: { date: "asc" },
-  });
+  }),
+    prisma.dailyRecap.findMany({
+      where: {
+        userId: session.user.id,
+        date: dateFilter,
+      },
+      select: {
+        disciplineScore: true,
+        sessionEfficiency: true,
+      },
+    }),
+  ]);
+
+  const recapSummary =
+    recapsInPeriod.length === 0
+      ? null
+      : {
+          recapsInPeriod: recapsInPeriod.length,
+          avgDisciplineScore:
+            recapsInPeriod.reduce((s, r) => s + r.disciplineScore, 0) / recapsInPeriod.length,
+          avgSessionEfficiency: (() => {
+            const withEff = recapsInPeriod.filter((r) => r.sessionEfficiency != null);
+            if (withEff.length === 0) return null as number | null;
+            return (
+              withEff.reduce((s, r) => s + (r.sessionEfficiency as number), 0) / withEff.length
+            );
+          })(),
+        };
 
   const psychTrades: TradePsychSlice[] = trades;
 
@@ -383,6 +437,90 @@ export async function GET(req: Request) {
   const daysWithTrades = new Set(trades.map((t) => t.date.toISOString().slice(0, 10))).size;
   const tradesPerDay = daysWithTrades > 0 ? trades.length / daysWithTrades : null;
 
+  const netPnlsChronological = trades.map((t) => t.pnl - t.fees);
+  const monteCarlo = computeMonteCarlo(netPnlsChronological);
+  const activityHeatmap = buildActivityHeatmap(
+    trades.map((t) => ({ date: t.date, pnl: t.pnl, fees: t.fees }))
+  );
+  const avgLossAbs = losses > 0 ? Math.abs(avgLoss) : 0;
+  const kelly = computeKelly(wins, losses, avgWin, avgLossAbs);
+
+  const behaviorTrades: TradeBehaviorSlice[] = trades.map((t) => ({
+    direction: t.direction,
+    pnl: t.pnl,
+    fees: t.fees,
+    risk: t.risk,
+    rr: t.rr,
+    outcome: t.outcome,
+    marketVolatility: t.marketVolatility,
+    exitType: t.exitType,
+    entryPrice: t.entryPrice,
+    exitPrice: t.exitPrice,
+    initialTp: t.initialTp,
+    initialSl: t.initialSl,
+    price5mAfter: t.price5mAfter,
+    price15mAfter: t.price15mAfter,
+    price60mAfter: t.price60mAfter,
+  }));
+  const byVolatility = buildVolatilityBuckets(behaviorTrades);
+  const contextualTilt = contextualTiltFromBuckets(byVolatility);
+  const postTradeDrift = postTradeDriftSeries(behaviorTrades);
+  const ghostStopTotalUsd = behaviorTrades.reduce((s, t) => s + ghostStopCostUsd(t), 0);
+  const manualCount = behaviorTrades.filter((t) => t.exitType === "manual").length;
+
+  const traderBehavior = {
+    byVolatility,
+    contextualTilt: {
+      show: contextualTilt.show,
+      winRatePct: contextualTilt.winRatePct,
+      sampleSize: contextualTilt.sampleSize,
+      messageRu:
+        "Внимание: ты теряешь деньги в узких диапазонах. Рекомендуется воздержаться от торгов в такие периоды.",
+      messageEn:
+        "Warning: you are losing edge in low-volatility conditions. Consider standing aside during tight ranges.",
+    },
+    postTradeDrift,
+    ghostStop: {
+      totalMissedProfitUsd: ghostStopTotalUsd,
+      manualTradesInPeriod: manualCount,
+    },
+  };
+
+  const pf =
+    profitFactor === Infinity ? 999.99 : profitFactor;
+
+  const actionableInsights = buildActionableInsights({
+    summary: {
+      tradesCount: trades.length,
+      wins,
+      losses,
+      winRate,
+      expectancy,
+      profitFactor: pf,
+      maxDrawdown,
+      maxLossStreak,
+      totalPnl,
+    },
+    psych: {
+      coverage: psychCoverage,
+      segmentHighlights,
+    },
+    traderBehavior: {
+      contextualTilt: traderBehavior.contextualTilt,
+      ghostStop: traderBehavior.ghostStop,
+    },
+    kelly: {
+      recommendedRiskPct: kelly.recommendedRiskPct,
+      decidedTrades: kelly.decidedTrades,
+    },
+    recapSummary: recapSummary
+      ? {
+          recapsInPeriod: recapSummary.recapsInPeriod,
+          avgDisciplineScore: recapSummary.avgDisciplineScore,
+        }
+      : null,
+  });
+
   return NextResponse.json({
     summary: {
       totalPnl,
@@ -393,7 +531,7 @@ export async function GET(req: Request) {
       avgWin,
       avgLoss,
       expectancy,
-      profitFactor: profitFactor === Infinity ? 999.99 : profitFactor,
+      profitFactor: pf,
       maxDrawdown,
       currentWinStreak,
       currentLossStreak,
@@ -433,5 +571,11 @@ export async function GET(req: Request) {
       stressEnergyGrid,
       segmentHighlights,
     },
+    monteCarlo,
+    activityHeatmap,
+    kelly,
+    traderBehavior,
+    recapSummary,
+    actionableInsights,
   });
 }

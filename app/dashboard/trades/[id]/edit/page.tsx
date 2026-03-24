@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,10 +11,37 @@ import {
   defaultTraderState,
   type TraderStateValues,
 } from "@/components/trader-state-fields";
+import {
+  TradeBehaviorFields,
+  behaviorPayloadFromForm,
+  defaultTradeBehaviorForm,
+  type TradeBehaviorFormValues,
+} from "@/components/trade-behavior-fields";
 
 type SetupType = { id: string; name: string };
 type ConfirmationType = { id: string; name: string };
 type TradeImage = { id: string; url: string; caption: string | null };
+
+function tradeToBehavior(t: Record<string, unknown>): TradeBehaviorFormValues {
+  const d = defaultTradeBehaviorForm();
+  const nStr = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? String(v) : "");
+  const vol = t.marketVolatility;
+  const sess = t.sessionType;
+  return {
+    ...d,
+    marketVolatility: vol === "low" || vol === "medium" || vol === "high" ? vol : "",
+    sessionType: sess === "trend" || sess === "range" ? sess : "",
+    exitType: t.exitType === "manual" ? "manual" : "system",
+    realizedPnl: t.exitType === "manual" && typeof t.pnl === "number" ? String(t.pnl) : "",
+    entryPrice: nStr(t.entryPrice),
+    exitPrice: nStr(t.exitPrice),
+    initialTp: nStr(t.initialTp),
+    initialSl: nStr(t.initialSl),
+    price5mAfter: nStr(t.price5mAfter),
+    price15mAfter: nStr(t.price15mAfter),
+    price60mAfter: nStr(t.price60mAfter),
+  };
+}
 
 export default function EditTradePage() {
   const lang = useAppLanguage();
@@ -121,15 +148,20 @@ export default function EditTradePage() {
     confirmationIds: [] as string[],
   });
   const [trader, setTrader] = useState<TraderStateValues>(() => defaultTraderState());
+  const [behavior, setBehavior] = useState<TradeBehaviorFormValues>(() => defaultTradeBehaviorForm());
 
-  const calculatedPnl =
-    form.risk && parseFloat(form.risk) > 0
-      ? form.outcome === "win"
-        ? parseFloat(form.risk) * parseFloat(form.rr || "1")
-        : form.outcome === "loss"
-        ? -parseFloat(form.risk)
-        : 0
-      : null;
+  const calculatedPnl = useMemo(() => {
+    const risk = parseFloat(form.risk);
+    const rr = parseFloat(form.rr || "1");
+    if (!(risk > 0)) return null;
+    if (behavior.exitType === "manual" && behavior.realizedPnl.trim() !== "") {
+      const rp = parseFloat(behavior.realizedPnl);
+      if (Number.isFinite(rp)) return rp;
+    }
+    if (form.outcome === "win") return risk * rr;
+    if (form.outcome === "loss") return -risk;
+    return 0;
+  }, [form.risk, form.rr, form.outcome, behavior.exitType, behavior.realizedPnl]);
 
   useEffect(() => {
     fetch(`/api/trades/${id}`)
@@ -160,6 +192,7 @@ export default function EditTradePage() {
             stressLevel: (t.stressLevel || "") as TraderStateValues["stressLevel"],
             stateMoodTag: t.stateMoodTag || "",
           });
+          setBehavior(tradeToBehavior(t));
         }
       });
   }, [id]);
@@ -222,6 +255,7 @@ export default function EditTradePage() {
       sleepHours: Number.isFinite(sleepParsed) ? sleepParsed : null,
       stressLevel: trader.stressLevel || null,
       stateMoodTag: trader.stateMoodTag.trim() || null,
+      ...behaviorPayloadFromForm(behavior),
     };
     const res = await fetch(`/api/trades/${id}`, {
       method: "PATCH",
@@ -453,6 +487,11 @@ export default function EditTradePage() {
             </select>
           </div>
         </div>
+
+        <TradeBehaviorFields
+          values={behavior}
+          onChange={(key, value) => setBehavior((b) => ({ ...b, [key]: value }))}
+        />
 
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-2">

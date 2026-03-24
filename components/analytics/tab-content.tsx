@@ -1,3 +1,5 @@
+import { AdvancedAnalyticsTab } from "@/components/analytics/advanced-tab";
+import { BehaviorAnalyticsTab } from "@/components/analytics/behavior-tab";
 import { AnalyticsDto, AnalyticsTabId } from "@/components/analytics/types";
 import {
   FunnelTab,
@@ -16,7 +18,19 @@ type Props = {
 };
 
 export function AnalyticsTabContent({ activeTab, data }: Props) {
-  const { summary, bySymbol, bySetup, byConfirmation, dailyPnl, cumulativeData, drawdownData, psych } = data;
+  const {
+    summary,
+    bySymbol,
+    bySetup,
+    byConfirmation,
+    dailyPnl,
+    cumulativeData,
+    drawdownData,
+    psych,
+    actionableInsights,
+    recapSummary,
+    traderBehavior,
+  } = data;
   const totalTrades = summary.tradesCount || 0;
   const breakevenCount = summary.breakevenCount ?? Math.max(0, totalTrades - summary.wins - summary.losses);
   const rrEstimate = summary.avgLoss ? Math.abs(summary.avgWin / summary.avgLoss) : null;
@@ -75,6 +89,9 @@ export function AnalyticsTabContent({ activeTab, data }: Props) {
     confirmationRows,
     consistencyScore,
     activeConsistencyTrend,
+    actionableInsights: actionableInsights ?? [],
+    recapSummary: recapSummary ?? null,
+    contextualTilt: traderBehavior?.contextualTilt,
   };
 
   if (activeTab === "funnel") return <FunnelTab vm={vm} />;
@@ -83,5 +100,17 @@ export function AnalyticsTabContent({ activeTab, data }: Props) {
   if (activeTab === "time-patterns") return <TimePatternsTab vm={vm} />;
   if (activeTab === "quality") return <QualityTab vm={vm} />;
   if (activeTab === "psych") return <PsychTab vm={vm} />;
+  if (activeTab === "advanced") {
+    return (
+      <AdvancedAnalyticsTab
+        monteCarlo={data.monteCarlo}
+        activityHeatmap={data.activityHeatmap}
+        kelly={data.kelly}
+      />
+    );
+  }
+  if (activeTab === "behavior") {
+    return <BehaviorAnalyticsTab data={data.traderBehavior} />;
+  }
   return <OverviewTab vm={vm} />;
 }

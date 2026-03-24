@@ -9,7 +9,74 @@ export type AnalyticsTabId =
   | "segments"
   | "time-patterns"
   | "quality"
-  | "psych";
+  | "psych"
+  | "advanced"
+  | "behavior";
+
+export type VolatilityBucketRow = {
+  key: string;
+  label: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  winRatePct: number;
+  profitFactor: number | null;
+  pnl: number;
+};
+
+export type TraderBehaviorDto = {
+  byVolatility: VolatilityBucketRow[];
+  contextualTilt: {
+    show: boolean;
+    winRatePct: number | null;
+    sampleSize: number;
+    messageRu: string;
+    messageEn: string;
+  };
+  postTradeDrift: { horizon: string; avgFavorablePoints: number | null; samples: number }[];
+  ghostStop: {
+    totalMissedProfitUsd: number;
+    manualTradesInPeriod: number;
+  };
+};
+
+export type MonteCarloDto = {
+  tradeCount: number;
+  iterations: number;
+  historicalMaxDrawdown: number;
+  maxDrawdownProbabilityPct: number;
+  medianSimulatedMaxDrawdown: number;
+  chartRows: { step: number; [key: string]: number | string }[];
+  pathKeys: string[];
+};
+
+export type HeatmapCellDto = {
+  weekday: number;
+  weekdayLabel: string;
+  hour: number;
+  trades: number;
+  wins: number;
+  losses: number;
+  winRatePct: number;
+  profitFactor: number | null;
+  pnl: number;
+};
+
+export type ActivityHeatmapDto = {
+  cells: HeatmapCellDto[];
+  usSessionHoursMsk: [number, number];
+};
+
+export type KellyAnalyticsDto = {
+  winRateDecimal: number;
+  payoffRatio: number | null;
+  fullKellyFraction: number | null;
+  fractionalKellyFraction: number | null;
+  recommendedRiskFraction: number | null;
+  recommendedRiskPct: number | null;
+  capFraction: number;
+  decidedTrades: number;
+};
 
 export type PsychSegmentRow = {
   count: number;
@@ -58,6 +125,22 @@ export type AnalyticsPsychDto = {
   };
 };
 
+export type ActionableInsightDto = {
+  id: string;
+  severity: "critical" | "warning" | "positive" | "info";
+  titleEn: string;
+  titleRu: string;
+  detailEn: string;
+  detailRu: string;
+  href?: string;
+};
+
+export type AnalyticsRecapSummaryDto = {
+  recapsInPeriod: number;
+  avgDisciplineScore: number;
+  avgSessionEfficiency: number | null;
+};
+
 export type AnalyticsDto = {
   summary: {
     totalPnl: number;
@@ -95,4 +178,10 @@ export type AnalyticsDto = {
   cumulativeData: { date: string; pnl: number; cumulative: number }[];
   drawdownData?: { date: string; cumulative: number; drawdown: number }[];
   psych: AnalyticsPsychDto;
+  monteCarlo: MonteCarloDto;
+  activityHeatmap: ActivityHeatmapDto;
+  kelly: KellyAnalyticsDto;
+  traderBehavior: TraderBehaviorDto;
+  recapSummary?: AnalyticsRecapSummaryDto | null;
+  actionableInsights?: ActionableInsightDto[];
 };

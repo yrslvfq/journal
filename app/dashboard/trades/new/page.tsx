@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,6 +11,11 @@ import {
   defaultTraderState,
   type TraderStateValues,
 } from "@/components/trader-state-fields";
+import {
+  TradeBehaviorFields,
+  behaviorPayloadFromForm,
+  defaultTradeBehaviorForm,
+} from "@/components/trade-behavior-fields";
 
 type SetupType = { id: string; name: string };
 type ConfirmationType = { id: string; name: string };
@@ -46,15 +51,20 @@ export default function NewTradePage() {
     confirmationIds: [] as string[],
   });
   const [trader, setTrader] = useState<TraderStateValues>(() => defaultTraderState());
+  const [behavior, setBehavior] = useState(() => defaultTradeBehaviorForm());
 
-  const calculatedPnl =
-    form.risk && parseFloat(form.risk) > 0
-      ? form.outcome === "win"
-        ? parseFloat(form.risk) * parseFloat(form.rr || "1")
-        : form.outcome === "loss"
-        ? -parseFloat(form.risk)
-        : 0
-      : null;
+  const calculatedPnl = useMemo(() => {
+    const risk = parseFloat(form.risk);
+    const rr = parseFloat(form.rr || "1");
+    if (!(risk > 0)) return null;
+    if (behavior.exitType === "manual" && behavior.realizedPnl.trim() !== "") {
+      const rp = parseFloat(behavior.realizedPnl);
+      if (Number.isFinite(rp)) return rp;
+    }
+    if (form.outcome === "win") return risk * rr;
+    if (form.outcome === "loss") return -risk;
+    return 0;
+  }, [form.risk, form.rr, form.outcome, behavior.exitType, behavior.realizedPnl]);
 
   useEffect(() => {
     fetch("/api/setup-types").then((r) => r.json()).then(setSetupTypes);
@@ -173,6 +183,7 @@ export default function NewTradePage() {
       sleepHours: Number.isFinite(sleepParsed) ? sleepParsed : null,
       stressLevel: trader.stressLevel || null,
       stateMoodTag: trader.stateMoodTag.trim() || null,
+      ...behaviorPayloadFromForm(behavior),
     };
     const res = await fetch("/api/trades", {
       method: "POST",
@@ -394,6 +405,11 @@ export default function NewTradePage() {
             </select>
           </div>
         </div>
+
+        <TradeBehaviorFields
+          values={behavior}
+          onChange={(key, value) => setBehavior((b) => ({ ...b, [key]: value }))}
+        />
 
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-2">

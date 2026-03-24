@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { normalizeTagName } from "@/lib/trade-tags";
+import { computeStatedPnl } from "@/lib/trade-pnl";
 
 const createSchema = z.object({
   symbol: z.string().min(1),
@@ -24,6 +25,17 @@ const createSchema = z.object({
   sleepHours: z.number().min(0).max(24).optional().nullable(),
   stressLevel: z.enum(["low", "medium", "high"]).optional().nullable(),
   stateMoodTag: z.string().max(64).optional().nullable(),
+  marketVolatility: z.enum(["low", "medium", "high"]).optional().nullable(),
+  sessionType: z.enum(["trend", "range"]).optional().nullable(),
+  exitType: z.enum(["system", "manual"]).optional().default("system"),
+  realizedPnl: z.number().optional().nullable(),
+  entryPrice: z.number().optional().nullable(),
+  exitPrice: z.number().optional().nullable(),
+  initialTp: z.number().optional().nullable(),
+  initialSl: z.number().optional().nullable(),
+  price5mAfter: z.number().optional().nullable(),
+  price15mAfter: z.number().optional().nullable(),
+  price60mAfter: z.number().optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -94,8 +106,13 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = createSchema.parse(body);
 
-    const pnl =
-      data.outcome === "win" ? data.risk * data.rr : data.outcome === "loss" ? -data.risk : 0;
+    const pnl = computeStatedPnl({
+      outcome: data.outcome,
+      risk: data.risk,
+      rr: data.rr,
+      exitType: data.exitType,
+      realizedPnl: data.realizedPnl,
+    });
 
     const tagNames = (data.tags ?? [])
       .map((name) => normalizeTagName(name))
@@ -121,6 +138,16 @@ export async function POST(req: Request) {
         sleepHours: data.sleepHours ?? undefined,
         stressLevel: data.stressLevel ?? undefined,
         stateMoodTag: data.stateMoodTag?.trim() || undefined,
+        marketVolatility: data.marketVolatility ?? undefined,
+        sessionType: data.sessionType ?? undefined,
+        exitType: data.exitType,
+        entryPrice: data.entryPrice ?? undefined,
+        exitPrice: data.exitPrice ?? undefined,
+        initialTp: data.initialTp ?? undefined,
+        initialSl: data.initialSl ?? undefined,
+        price5mAfter: data.price5mAfter ?? undefined,
+        price15mAfter: data.price15mAfter ?? undefined,
+        price60mAfter: data.price60mAfter ?? undefined,
         tags: uniqueTags.length
           ? { create: uniqueTags.map((name) => ({ name })) }
           : undefined,

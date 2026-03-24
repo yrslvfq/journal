@@ -12,7 +12,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AnalyticsDto, AnalyticsPsychDto } from "@/components/analytics/types";
+import {
+  ActionableInsightDto,
+  AnalyticsDto,
+  AnalyticsPsychDto,
+  AnalyticsRecapSummaryDto,
+} from "@/components/analytics/types";
+import {
+  ActionableInsightsList,
+  ContextualTiltBanner,
+  RecapSummaryStrip,
+} from "@/components/analytics/insight-blocks";
 import { useAppLanguage } from "@/lib/app-language";
 import { dashboardT, sleepBandLabel, stressLevelLabel } from "@/lib/i18n/dashboard";
 
@@ -35,12 +45,35 @@ export type AnalyticsViewModel = {
   confirmationRows: AnalyticsDto["byConfirmation"];
   consistencyScore: number;
   activeConsistencyTrend: { label: string; score: number }[];
+  actionableInsights?: ActionableInsightDto[];
+  recapSummary?: AnalyticsRecapSummaryDto | null;
+  contextualTilt?: AnalyticsDto["traderBehavior"]["contextualTilt"];
 };
 
 export function OverviewTab({ vm }: { vm: AnalyticsViewModel }) {
+  const lang = useAppLanguage();
   const { summary, bySymbol, dailyPnl } = vm;
+  const insights = vm.actionableInsights ?? [];
+  const showInsightStrip =
+    vm.contextualTilt?.show ||
+    (vm.recapSummary != null && vm.recapSummary.recapsInPeriod > 0) ||
+    insights.length > 0;
+
   return (
     <>
+      {showInsightStrip && (
+        <div className="mb-8 space-y-5">
+          {vm.contextualTilt && <ContextualTiltBanner tilt={vm.contextualTilt} lang={lang} />}
+          {vm.recapSummary && <RecapSummaryStrip recap={vm.recapSummary} lang={lang} />}
+          <ActionableInsightsList
+            insights={insights}
+            lang={lang}
+            titleRu="Выводы по выбранному периоду"
+            titleEn="Insights for this period"
+          />
+        </div>
+      )}
+
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         <Kpi title="Total P&L" value={`${summary.totalPnl >= 0 ? "+" : ""}${summary.totalPnl.toFixed(2)}`} tone={summary.totalPnl >= 0 ? "pos" : "neg"} />
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-5">

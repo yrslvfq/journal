@@ -16,6 +16,8 @@ const HUB_TABS: { id: AnalyticsTabId; label: string }[] = [
   { id: "time-patterns", label: "Time Patterns" },
   { id: "quality", label: "Quality" },
   { id: "psych", label: "Psych" },
+  { id: "advanced", label: "Advanced" },
+  { id: "behavior", label: "Behavior" },
 ];
 
 export default function AnalyticsPage() {
