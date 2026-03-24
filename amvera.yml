@@ -7,7 +7,10 @@ meta:
 build:
   additionalCommands: npm ci --registry=https://registry.npmjs.org/ --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 && npx prisma generate && npm run build
 
+# containerPort по умолчанию у Node на Amvera — 80; Next слушает 3000 — обязательно 3000.
+# db push при каждом старте может затягивать поднятие порта → пробы/рестарты и SIGTERM.
+# --skip-generate: клиент уже собран на этапе build.
 run:
-  command: npx prisma db push && npm run start
+  command: npx prisma db push --skip-generate && npm run start
   containerPort: 3000
   persistenceMount: /data

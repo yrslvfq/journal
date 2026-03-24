@@ -41,6 +41,15 @@
 
 Приложение слушает порт 3000 (указано в `amvera.yml`). Amvera автоматически проксирует трафик на него.
 
+**Важно:** в [документации Node Server](https://docs.amvera.ru/applications/environments/nodejs-server.html) у `containerPort` по умолчанию указан **80**. Если не задать `containerPort: 3000`, балансировщик будет стучаться не в тот порт — возможны 502 и перезапуски контейнера.
+
+## Если в логах `SIGTERM` / `next start` обрывается
+
+1. **Проверьте переменные:** `DATABASE_URL=file:/data/journal.db`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`. Без БД на `/data` или с ошибкой `db push` процесс может не дойти до прослушивания порта.
+2. **Лог «Лог приложения»** в Amvera: успевает ли появиться строка вроде `Ready on` / `started server` до рестарта.
+3. **Долгий старт:** `prisma db push` перед `npm run start` удлиняет старт. В `amvera.yml` используется `db push --skip-generate` (генерация уже в `build`). Если рестарты остаются — в настройках проекта можно добавить [Kubernetes startup/liveness probe](https://docs.amvera.ru/general/k8sprobe.html) с большим `initialDelaySeconds` (например 60–120).
+4. **Мало RAM на тарифе** — OOM даёт внешнее завершение процесса; попробуйте повысить тариф или включить [standalone](https://nextjs.org/docs/app/api-reference/next-config-js/output)-сборку позже.
+
 ## Локальная разработка
 
 Без переменных `DATABASE_URL` и `UPLOADS_DIR` приложение использует:
