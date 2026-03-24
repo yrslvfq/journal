@@ -41,7 +41,7 @@ export default function AnalyticsPage() {
     ? (tabParam as AnalyticsTabId)
     : "overview";
 
-  const canFetch = period !== "custom" || (dateFrom && dateTo);
+  const canFetch = period !== "custom" || (!!dateFrom && !!dateTo);
   const exportHref = `/api/analytics/export?period=${period}${
     period === "custom" && dateFrom && dateTo ? `&dateFrom=${dateFrom}&dateTo=${dateTo}` : ""
   }`;
