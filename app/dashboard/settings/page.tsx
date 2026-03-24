@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/language-provider";
 
 type SetupType = {
   id: string;
@@ -246,6 +247,7 @@ function EditableConfirmationItem({
 }
 
 export default function SettingsPage() {
+  const { language, setLanguage } = useLanguage();
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([]);
   const [confirmationTypes, setConfirmationTypes] = useState<ConfirmationType[]>(
     []
@@ -307,6 +309,37 @@ export default function SettingsPage() {
   return (
     <div className="space-y-10">
       <h1 className="text-3xl font-bold text-white">Settings</h1>
+
+      <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-6">
+        <h2 className="text-lg font-medium text-white mb-2">Language</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Choose UI language for dashboard navigation and common labels.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLanguage("en")}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+              language === "en"
+                ? "bg-blue-600/20 text-blue-400 border-blue-500/40"
+                : "bg-slate-800/70 text-slate-300 border-slate-700/80"
+            }`}
+          >
+            English
+          </button>
+          <button
+            type="button"
+            onClick={() => setLanguage("ru")}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+              language === "ru"
+                ? "bg-blue-600/20 text-blue-400 border-blue-500/40"
+                : "bg-slate-800/70 text-slate-300 border-slate-700/80"
+            }`}
+          >
+            Русский
+          </button>
+        </div>
+      </div>
 
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-6">
         <h2 className="text-lg font-medium text-white mb-4">Setup types</h2>

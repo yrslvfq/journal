@@ -4,20 +4,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useLanguage } from "@/components/language-provider";
 
 const nav = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/dashboard/trades", label: "Trades" },
-  { href: "/dashboard/trades/gallery", label: "Trades Gallery" },
-  { href: "/dashboard/research", label: "Research" },
-  { href: "/dashboard/research/gallery", label: "Research Gallery" },
-  { href: "/dashboard/analytics", label: "Analytics" },
-  { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard", label: { en: "Dashboard", ru: "Дашборд" } },
+  { href: "/dashboard/trades", label: { en: "Trades", ru: "Сделки" } },
+  { href: "/dashboard/trades/gallery", label: { en: "Trades Gallery", ru: "Галерея сделок" } },
+  { href: "/dashboard/research", label: { en: "Research", ru: "Ресерч" } },
+  { href: "/dashboard/research/gallery", label: { en: "Research Gallery", ru: "Галерея ресерча" } },
+  { href: "/dashboard/analytics", label: { en: "Analytics", ru: "Аналитика" } },
+  { href: "/dashboard/settings", label: { en: "Settings", ru: "Настройки" } },
 ];
 
 export function DashboardNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { language } = useLanguage();
   return (
     <>
       <button
@@ -53,7 +55,7 @@ export function DashboardNav() {
                     : "text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent"
                 }`}
               >
-                {item.label}
+                {item.label[language]}
               </Link>
             );
           })}
@@ -63,7 +65,7 @@ export function DashboardNav() {
             onClick={() => signOut({ callbackUrl: "/" })}
             className="w-full text-left px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all duration-200"
           >
-            Sign out
+            {language === "ru" ? "Выйти" : "Sign out"}
           </button>
         </div>
       </aside>
