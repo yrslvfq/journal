@@ -13,6 +13,8 @@ import {
   YAxis,
 } from "recharts";
 import { AnalyticsDto, AnalyticsPsychDto } from "@/components/analytics/types";
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT, sleepBandLabel, stressLevelLabel } from "@/lib/i18n/dashboard";
 
 export type AnalyticsViewModel = {
   summary: AnalyticsDto["summary"];
@@ -243,73 +245,241 @@ export function TimePatternsTab({ vm }: { vm: AnalyticsViewModel }) {
   );
 }
 
+function fmtSigned2(x: number) {
+  return `${x >= 0 ? "+" : ""}${x.toFixed(2)}`;
+}
+
+function fmtPerRiskPct(v: number | null) {
+  if (v == null) return "—";
+  return `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
+}
+
 export function PsychTab({ vm }: { vm: AnalyticsViewModel }) {
+  const lang = useAppLanguage();
+  const pt = dashboardT(lang).psychTab;
   const { psych, summary } = vm;
-  const { coverage, byStress, byEnergy, bySleepBand, byMoodTag, insights } = psych;
+  const {
+    coverage,
+    byStress,
+    byEnergy,
+    bySleepBand,
+    byMoodTag,
+    insights,
+    fragileState,
+    stressEnergyGrid,
+    segmentHighlights,
+  } = psych;
 
   const stressChart = byStress.filter((r) => r.count > 0);
+  const stressChartLabeled = stressChart.map((r) => ({
+    ...r,
+    xLabel: stressLevelLabel(lang, r.level),
+  }));
   const energyChart = byEnergy.filter((r) => r.count > 0);
   const sleepChart = bySleepBand;
+  const sleepChartLabeled = sleepChart.map((r) => ({
+    ...r,
+    xLabel: sleepBandLabel(lang, r.band),
+  }));
+
+  const stressMiniRows = stressChart.map((r) => ({
+    key: r.level,
+    display: stressLevelLabel(lang, r.level),
+    count: r.count,
+    winRate: r.winRate,
+    avgPnl: r.avgPnl,
+  }));
+  const energyMiniRows = energyChart.map((r) => ({
+    key: String(r.energy),
+    display: String(r.energy),
+    count: r.count,
+    winRate: r.winRate,
+    avgPnl: r.avgPnl,
+  }));
+  const sleepMiniRows = sleepChart.map((r) => ({
+    key: r.band,
+    display: sleepBandLabel(lang, r.band),
+    count: r.count,
+    winRate: r.winRate,
+    avgPnl: r.avgPnl,
+  }));
+
+  const hasHighlights =
+    segmentHighlights.bestEnergy ||
+    segmentHighlights.worstEnergy ||
+    segmentHighlights.bestStress ||
+    segmentHighlights.worstStress;
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-          <p className="text-xs text-slate-500 uppercase tracking-wider">Покрытие психометрик</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wider">{pt.coverageTitle}</p>
           <p className="text-2xl font-bold text-white mt-1">
             {coverage.withAny} / {coverage.total}
           </p>
-          <p className="text-sm text-slate-400 mt-1">{coverage.percent.toFixed(1)}% сделок с данными</p>
+          <p className="text-sm text-slate-400 mt-1">{pt.coverageSub(coverage.percent)}</p>
         </div>
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
           <p className="text-xs text-slate-500 flex items-center gap-1">
-            Энергия при W vs L
-            <InfoHint text="Средний уровень энергии (1–5) на выигрышных и проигрышных сделках, где поле заполнено." />
+            {pt.energyWlTitle}
+            <InfoHint text={pt.energyWlHint} />
           </p>
           <p className="text-sm text-emerald-400 mt-2">Wins: {insights.avgEnergyWins?.toFixed(2) ?? "—"}</p>
           <p className="text-sm text-red-400">Losses: {insights.avgEnergyLosses?.toFixed(2) ?? "—"}</p>
         </div>
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
           <p className="text-xs text-slate-500 flex items-center gap-1">
-            Сон при W vs L
-            <InfoHint text="Средние часы сна на выигрышных и проигрышных сделках, где поле заполнено." />
+            {pt.sleepWlTitle}
+            <InfoHint text={pt.sleepWlHint} />
           </p>
-          <p className="text-sm text-emerald-400 mt-2">Wins: {insights.avgSleepWins?.toFixed(2) ?? "—"} ч</p>
-          <p className="text-sm text-red-400">Losses: {insights.avgSleepLosses?.toFixed(2) ?? "—"} ч</p>
+          <p className="text-sm text-emerald-400 mt-2">
+            Wins: {insights.avgSleepWins?.toFixed(2) ?? "—"} {pt.hoursSuffix}
+          </p>
+          <p className="text-sm text-red-400">
+            Losses: {insights.avgSleepLosses?.toFixed(2) ?? "—"} {pt.hoursSuffix}
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-          <p className="text-xs text-slate-500">Win rate (весь период)</p>
+          <p className="text-xs text-slate-500">{pt.winRatePeriod}</p>
           <p className="text-2xl font-bold text-white mt-1">{summary.winRate.toFixed(1)}%</p>
-          <p className="text-xs text-slate-500 mt-1">для сравнения с сегментами ниже</p>
+          <p className="text-xs text-slate-500 mt-1">{pt.winRateCompare}</p>
         </div>
       </div>
 
+      {coverage.total > 0 ? (
+        <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4">
+          <p className="text-xs text-slate-500 mb-3">{pt.coverageFieldsTitle}</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <p className="text-[11px] text-slate-500">{pt.fieldEnergy}</p>
+              <p className="text-sm font-medium text-white mt-0.5">
+                {pt.fieldFilled(coverage.byField.energy.percent, coverage.byField.energy.count)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-500">{pt.fieldSleep}</p>
+              <p className="text-sm font-medium text-white mt-0.5">
+                {pt.fieldFilled(coverage.byField.sleep.percent, coverage.byField.sleep.count)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-500">{pt.fieldStress}</p>
+              <p className="text-sm font-medium text-white mt-0.5">
+                {pt.fieldFilled(coverage.byField.stress.percent, coverage.byField.stress.count)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-500">{pt.fieldMood}</p>
+              <p className="text-sm font-medium text-white mt-0.5">
+                {pt.fieldFilled(coverage.byField.mood.percent, coverage.byField.mood.count)}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {coverage.withAny === 0 ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-8 text-center text-slate-300">
-          <p className="font-medium text-amber-200/90">Нет психометрик за выбранный период</p>
-          <p className="text-sm text-slate-500 mt-2">
-            Заполняйте блок «Состояние трейдера» при создании сделки — тогда здесь появятся корреляции с результатом.
-          </p>
+          <p className="font-medium text-amber-200/90">{pt.emptyTitle}</p>
+          <p className="text-sm text-slate-500 mt-2">{pt.emptyHint}</p>
         </div>
       ) : (
         <>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                {pt.stressIndexTitle}
+                <InfoHint text={pt.stressIndexHint} />
+              </p>
+              <p className="text-sm text-emerald-400 mt-2">
+                {pt.stressWinsLabel}: {insights.avgStressIndexWins?.toFixed(2) ?? "—"}
+              </p>
+              <p className="text-sm text-red-400">
+                {pt.stressLossesLabel}: {insights.avgStressIndexLosses?.toFixed(2) ?? "—"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                {pt.fragileTitle}
+                <InfoHint text={pt.fragileHint} />
+              </p>
+              <p className="text-lg font-semibold text-white mt-2">{pt.fragileN(fragileState.count)}</p>
+              <p className="text-sm text-slate-400 mt-1">{pt.fragileWr(fragileState.winRate)}</p>
+              <p
+                className={`text-sm font-medium mt-1 ${fragileState.avgPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}
+              >
+                {pt.fragileAvg(fmtSigned2(fragileState.avgPnl))}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">{pt.fragilePerRisk(fmtPerRiskPct(fragileState.expectancyPerRisk))}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                {pt.highlightsTitle}
+                <InfoHint text={pt.highlightsHint} />
+              </p>
+              {hasHighlights ? (
+                <ul className="mt-2 space-y-1.5 text-xs text-slate-300">
+                  {segmentHighlights.bestEnergy ? (
+                    <li>
+                      {pt.highlightBestEnergy(
+                        segmentHighlights.bestEnergy.energy,
+                        fmtSigned2(segmentHighlights.bestEnergy.avgPnl),
+                        segmentHighlights.bestEnergy.count
+                      )}
+                    </li>
+                  ) : null}
+                  {segmentHighlights.worstEnergy ? (
+                    <li>
+                      {pt.highlightWorstEnergy(
+                        segmentHighlights.worstEnergy.energy,
+                        fmtSigned2(segmentHighlights.worstEnergy.avgPnl),
+                        segmentHighlights.worstEnergy.count
+                      )}
+                    </li>
+                  ) : null}
+                  {segmentHighlights.bestStress ? (
+                    <li>
+                      {pt.highlightBestStress(
+                        stressLevelLabel(lang, segmentHighlights.bestStress.level),
+                        fmtSigned2(segmentHighlights.bestStress.avgPnl),
+                        segmentHighlights.bestStress.count
+                      )}
+                    </li>
+                  ) : null}
+                  {segmentHighlights.worstStress ? (
+                    <li>
+                      {pt.highlightWorstStress(
+                        stressLevelLabel(lang, segmentHighlights.worstStress.level),
+                        fmtSigned2(segmentHighlights.worstStress.avgPnl),
+                        segmentHighlights.worstStress.count
+                      )}
+                    </li>
+                  ) : null}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-500 mt-2">{pt.highlightsEmpty}</p>
+              )}
+            </div>
+          </div>
+
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-              <h3 className="mb-3 text-sm font-medium text-slate-400">Стресс → результат</h3>
+              <h3 className="mb-3 text-sm font-medium text-slate-400">{pt.chartStress}</h3>
               {stressChart.length === 0 ? (
-                <p className="text-sm text-slate-500">Нет данных по стрессу</p>
+                <p className="text-sm text-slate-500">{pt.noStress}</p>
               ) : (
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stressChart}>
+                    <BarChart data={stressChartLabeled}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="label" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                      <XAxis dataKey="xLabel" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} />
                       <YAxis stroke="#64748b" tick={{ fill: "#94a3b8" }} />
                       <Tooltip
                         contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px" }}
                       />
                       <Bar dataKey="avgPnl" name="avgPnl" radius={[6, 6, 0, 0]}>
-                        {stressChart.map((row) => (
+                        {stressChartLabeled.map((row) => (
                           <Cell key={row.level} fill={row.avgPnl >= 0 ? "#22c55e" : "#ef4444"} />
                         ))}
                       </Bar>
@@ -317,12 +487,12 @@ export function PsychTab({ vm }: { vm: AnalyticsViewModel }) {
                   </ResponsiveContainer>
                 </div>
               )}
-              <PsychMiniTable rows={byStress.filter((r) => r.count > 0)} labelKey="label" />
+              <PsychMiniTable rows={stressMiniRows} formatMini={pt.miniRow} />
             </div>
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-              <h3 className="mb-3 text-sm font-medium text-slate-400">Энергия (1–5) → средний P&L</h3>
+              <h3 className="mb-3 text-sm font-medium text-slate-400">{pt.chartEnergy}</h3>
               {energyChart.length === 0 ? (
-                <p className="text-sm text-slate-500">Нет данных по энергии</p>
+                <p className="text-sm text-slate-500">{pt.noEnergy}</p>
               ) : (
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
@@ -342,27 +512,24 @@ export function PsychTab({ vm }: { vm: AnalyticsViewModel }) {
                   </ResponsiveContainer>
                 </div>
               )}
-              <PsychMiniTable
-                rows={byEnergy.filter((r) => r.count > 0).map((r) => ({ ...r, label: String(r.energy) }))}
-                labelKey="label"
-              />
+              <PsychMiniTable rows={energyMiniRows} formatMini={pt.miniRow} />
             </div>
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-              <h3 className="mb-3 text-sm font-medium text-slate-400">Сон → средний P&L</h3>
+              <h3 className="mb-3 text-sm font-medium text-slate-400">{pt.chartSleep}</h3>
               {sleepChart.length === 0 ? (
-                <p className="text-sm text-slate-500">Нет данных по сну</p>
+                <p className="text-sm text-slate-500">{pt.noSleep}</p>
               ) : (
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={sleepChart}>
+                    <BarChart data={sleepChartLabeled}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="band" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                      <XAxis dataKey="xLabel" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 10 }} />
                       <YAxis stroke="#64748b" tick={{ fill: "#94a3b8" }} />
                       <Tooltip
                         contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "12px" }}
                       />
                       <Bar dataKey="avgPnl" radius={[6, 6, 0, 0]}>
-                        {sleepChart.map((row) => (
+                        {sleepChartLabeled.map((row) => (
                           <Cell key={row.band} fill={row.avgPnl >= 0 ? "#a78bfa" : "#fb7185"} />
                         ))}
                       </Bar>
@@ -370,24 +537,72 @@ export function PsychTab({ vm }: { vm: AnalyticsViewModel }) {
                   </ResponsiveContainer>
                 </div>
               )}
-              <PsychMiniTable rows={sleepChart} labelKey="band" />
+              <PsychMiniTable rows={sleepMiniRows} formatMini={pt.miniRow} />
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
-            <h3 className="mb-3 text-sm font-medium text-slate-400">Теги состояния (FOMO, Tilt, …)</h3>
+            <h3 className="mb-1 text-sm font-medium text-slate-400 flex items-center gap-1">
+              {pt.gridTitle}
+              <InfoHint text={pt.gridHint} />
+            </h3>
+            {stressEnergyGrid.length === 0 ? (
+              <p className="text-sm text-slate-500 mt-2">{pt.gridEmpty}</p>
+            ) : (
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="text-xs text-slate-500 border-b border-slate-800">
+                      <th className="pb-2 pr-4 font-medium">{pt.gridColStress}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.gridColEnergy}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colN}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colWr}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colAvgPnl}</th>
+                      <th className="pb-2 font-medium flex items-center gap-1">
+                        {pt.colPerRisk}
+                        <InfoHint text={pt.perRiskHint} />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stressEnergyGrid.map((row) => (
+                      <tr key={`${row.stressLevel}-${row.energy}`} className="border-b border-slate-800/60">
+                        <td className="py-2 pr-4 text-slate-200">{stressLevelLabel(lang, row.stressLevel)}</td>
+                        <td className="py-2 pr-4 text-slate-300">{row.energy}</td>
+                        <td className="py-2 pr-4 text-slate-300">{row.count}</td>
+                        <td className="py-2 pr-4 text-slate-300">{row.winRate.toFixed(1)}%</td>
+                        <td className={`py-2 pr-4 font-medium ${row.avgPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {fmtSigned2(row.avgPnl)}
+                        </td>
+                        <td className="py-2 text-slate-300">{fmtPerRiskPct(row.expectancyPerRisk)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5">
+            <h3 className="mb-3 text-sm font-medium text-slate-400">{pt.moodTitle}</h3>
             {byMoodTag.length === 0 ? (
-              <p className="text-sm text-slate-500">Нет тегов настроения</p>
+              <p className="text-sm text-slate-500">{pt.noMood}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead>
                     <tr className="text-xs text-slate-500 border-b border-slate-800">
-                      <th className="pb-2 pr-4 font-medium">Тег</th>
-                      <th className="pb-2 pr-4 font-medium">N</th>
-                      <th className="pb-2 pr-4 font-medium">Win rate</th>
-                      <th className="pb-2 pr-4 font-medium">Σ P&L</th>
-                      <th className="pb-2 font-medium">Avg P&L</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colTag}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colN}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colWr}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colSumPnl}</th>
+                      <th className="pb-2 pr-4 font-medium">{pt.colAvgPnl}</th>
+                      <th className="pb-2 font-medium">
+                        <span className="inline-flex items-center gap-1">
+                          {pt.colPerRisk}
+                          <InfoHint text={pt.perRiskHint} />
+                        </span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -402,10 +617,11 @@ export function PsychTab({ vm }: { vm: AnalyticsViewModel }) {
                           {row.totalPnl >= 0 ? "+" : ""}
                           {row.totalPnl.toFixed(2)}
                         </td>
-                        <td className={`py-2 font-medium ${row.avgPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <td className={`py-2 pr-4 font-medium ${row.avgPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                           {row.avgPnl >= 0 ? "+" : ""}
                           {row.avgPnl.toFixed(2)}
                         </td>
+                        <td className="py-2 text-slate-300">{fmtPerRiskPct(row.expectancyPerRisk)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -421,25 +637,21 @@ export function PsychTab({ vm }: { vm: AnalyticsViewModel }) {
 
 function PsychMiniTable({
   rows,
-  labelKey,
+  formatMini,
 }: {
-  rows: { label?: string; band?: string; count: number; winRate: number; avgPnl: number }[];
-  labelKey: "label" | "band";
+  rows: { key: string; display: string; count: number; winRate: number; avgPnl: number }[];
+  formatMini: (n: number, wr: number, avg: string) => string;
 }) {
   if (rows.length === 0) return null;
   return (
     <div className="mt-4 space-y-1.5 text-xs text-slate-400">
       {rows.map((row) => {
-        const lab = labelKey === "band" ? row.band! : row.label!;
+        const avgStr = `${row.avgPnl >= 0 ? "+" : ""}${row.avgPnl.toFixed(2)}`;
         return (
-          <div key={lab} className="flex justify-between gap-2">
-            <span className="text-slate-300">{lab}</span>
-            <span>
-              n={row.count} · WR {row.winRate.toFixed(0)}% · avg{" "}
-              <span className={row.avgPnl >= 0 ? "text-emerald-400" : "text-red-400"}>
-                {row.avgPnl >= 0 ? "+" : ""}
-                {row.avgPnl.toFixed(2)}
-              </span>
+          <div key={row.key} className="flex justify-between gap-2">
+            <span className="text-slate-300">{row.display}</span>
+            <span className="text-right">
+              {formatMini(row.count, Math.round(row.winRate), avgStr)}
             </span>
           </div>
         );

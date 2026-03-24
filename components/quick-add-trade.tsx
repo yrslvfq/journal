@@ -17,22 +17,8 @@ export function QuickAddTrade() {
     outcome: "win" as "win" | "loss" | "be",
     date: localDateYMD(),
   });
-  const [killBlocked, setKillBlocked] = useState(false);
-  const [killSeconds, setKillSeconds] = useState(0);
 
-  const refreshKill = useCallback(async (ymd: string) => {
-    const res = await fetch(`/api/trades/kill-switch?date=${encodeURIComponent(ymd)}`);
-    const data = await res.json();
-    if (!res.ok) return;
-    setKillBlocked(!!data.blocked);
-    setKillSeconds(typeof data.secondsRemaining === "number" ? data.secondsRemaining : 0);
-  }, []);
-
-  const openModal = useCallback(() => {
-    setOpen(true);
-    const ymd = form.date || localDateYMD();
-    refreshKill(ymd);
-  }, [form.date, refreshKill]);
+  const openModal = useCallback(() => setOpen(true), []);
   const closeModal = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
@@ -47,28 +33,8 @@ export function QuickAddTrade() {
     return () => window.removeEventListener("keydown", fn);
   }, []);
 
-  useEffect(() => {
-    if (!open || !killBlocked || killSeconds <= 0) return;
-    const t = setInterval(() => {
-      setKillSeconds((s) => {
-        if (s <= 1) {
-          refreshKill(form.date || localDateYMD());
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [open, killBlocked, killSeconds, form.date, refreshKill]);
-
-  useEffect(() => {
-    if (!open) return;
-    refreshKill(form.date || localDateYMD());
-  }, [open, form.date, refreshKill]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (killBlocked) return;
     if (!form.symbol.trim() || !form.risk || parseFloat(form.risk) <= 0) return;
     setLoading(true);
     const body = {
@@ -142,18 +108,6 @@ export function QuickAddTrade() {
                 <p className="text-sm text-slate-500 mt-1">Cmd+K / Ctrl+K to toggle</p>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {killBlocked && (
-                  <div className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
-                    <p className="font-medium mb-1">Пауза обязательна</p>
-                    <p className="text-red-300/90 text-xs mb-2">
-                      Три убыточные сделки подряд за этот день. Обратный отсчёт до разблокировки:
-                    </p>
-                    <p className="text-2xl font-mono text-amber-400 tabular-nums">
-                      {String(Math.floor(killSeconds / 60)).padStart(2, "0")}:
-                      {String(killSeconds % 60).padStart(2, "0")}
-                    </p>
-                  </div>
-                )}
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Symbol *</label>
                   <input
@@ -241,7 +195,7 @@ export function QuickAddTrade() {
                   </button>
                   <button
                     type="submit"
-                    disabled={loading || killBlocked}
+                    disabled={loading}
                     className="flex-1 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
                   >
                     {loading ? "Saving..." : "Add"}

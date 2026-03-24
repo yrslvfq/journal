@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { TradeKillSwitchGate } from "@/components/trade-kill-switch-gate";
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 import {
   TraderStateFields,
   defaultTraderState,
@@ -17,6 +18,8 @@ type ConfirmationType = { id: string; name: string };
 const MAX_IMAGES = 10;
 
 export default function NewTradePage() {
+  const lang = useAppLanguage();
+  const tf = dashboardT(lang).tradeForm;
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -214,8 +217,7 @@ export default function NewTradePage() {
   }
 
   return (
-    <TradeKillSwitchGate tradeDateYmd={form.date}>
-      <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
         <Link
           href="/dashboard/trades"
@@ -470,10 +472,7 @@ export default function NewTradePage() {
           <label className="block text-sm font-medium text-zinc-300 mb-2">
             Notes
           </label>
-          <p className="text-xs text-slate-500 mb-2">
-            Связи со сделками: <code className="text-slate-400">[[clxxxxxxxx]]</code> — ID из URL карточки
-            сделки.
-          </p>
+          <p className="text-xs text-slate-500 mb-2">{tf.notesWikiNew}</p>
           <textarea
             name="notes"
             value={form.notes}
@@ -594,7 +593,6 @@ export default function NewTradePage() {
           {loading ? "Saving..." : "Save trade"}
         </button>
       </form>
-      </div>
-    </TradeKillSwitchGate>
+    </div>
   );
 }

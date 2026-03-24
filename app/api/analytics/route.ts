@@ -4,10 +4,41 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   psychSegmentStats,
-  sleepBand,
+  sleepBandId,
+  SLEEP_BAND_ORDER,
+  stressLevelToIndex,
   tradeNet,
+  type SleepBandId,
   type TradePsychSlice,
 } from "@/lib/analytics-psych";
+
+const SEGMENT_HIGHLIGHT_MIN = 3;
+
+function pickBestWorstEnergy(rows: { energy: number; avgPnl: number; count: number }[]) {
+  if (rows.length === 0) {
+    return { best: null as null, worst: null as null };
+  }
+  let best = rows[0];
+  let worst = rows[0];
+  for (const r of rows) {
+    if (r.avgPnl > best.avgPnl) best = r;
+    if (r.avgPnl < worst.avgPnl) worst = r;
+  }
+  return { best, worst };
+}
+
+function pickBestWorstStress(rows: { level: string; avgPnl: number; count: number }[]) {
+  if (rows.length === 0) {
+    return { best: null as null, worst: null as null };
+  }
+  let best = rows[0];
+  let worst = rows[0];
+  for (const r of rows) {
+    if (r.avgPnl > best.avgPnl) best = r;
+    if (r.avgPnl < worst.avgPnl) worst = r;
+  }
+  return { best, worst };
+}
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -77,23 +108,29 @@ export async function GET(req: Request) {
       !!t.stressLevel ||
       !!(t.stateMoodTag && t.stateMoodTag.trim())
   );
+  const psychTotal = psychTrades.length;
+  const fieldPct = (n: number) => (psychTotal > 0 ? (n / psychTotal) * 100 : 0);
+  const countEnergy = psychTrades.filter((t) => t.energyLevel != null).length;
+  const countSleep = psychTrades.filter((t) => t.sleepHours != null).length;
+  const countStress = psychTrades.filter((t) => !!t.stressLevel).length;
+  const countMood = psychTrades.filter((t) => !!(t.stateMoodTag && t.stateMoodTag.trim())).length;
   const psychCoverage = {
-    total: psychTrades.length,
+    total: psychTotal,
     withAny: withAnyPsych.length,
-    percent: psychTrades.length > 0 ? (withAnyPsych.length / psychTrades.length) * 100 : 0,
+    percent: psychTotal > 0 ? (withAnyPsych.length / psychTotal) * 100 : 0,
+    byField: {
+      energy: { count: countEnergy, percent: fieldPct(countEnergy) },
+      sleep: { count: countSleep, percent: fieldPct(countSleep) },
+      stress: { count: countStress, percent: fieldPct(countStress) },
+      mood: { count: countMood, percent: fieldPct(countMood) },
+    },
   };
 
-  const stressLabels: Record<string, string> = {
-    low: "Низкий",
-    medium: "Средний",
-    high: "Высокий",
-  };
   const byStress = (["low", "medium", "high"] as const).map((level) => {
     const subset = psychTrades.filter((t) => t.stressLevel === level);
     const s = psychSegmentStats(subset);
     return {
       level,
-      label: stressLabels[level],
       ...s,
     };
   });
@@ -104,20 +141,17 @@ export async function GET(req: Request) {
     return { energy, ...s };
   });
 
-  const sleepBuckets = new Map<string, TradePsychSlice[]>();
+  const sleepBuckets = new Map<SleepBandId, TradePsychSlice[]>();
   for (const t of psychTrades) {
     if (t.sleepHours == null) continue;
-    const band = sleepBand(t.sleepHours);
+    const band = sleepBandId(t.sleepHours);
     if (!sleepBuckets.has(band)) sleepBuckets.set(band, []);
     sleepBuckets.get(band)!.push(t);
   }
-  const sleepOrder = ["< 6 ч", "6–7 ч", "7–8 ч", "≥ 8 ч"];
-  const bySleepBand = sleepOrder
-    .filter((band) => sleepBuckets.has(band))
-    .map((band) => {
-      const subset = sleepBuckets.get(band)!;
-      return { band, ...psychSegmentStats(subset) };
-    });
+  const bySleepBand = SLEEP_BAND_ORDER.filter((band) => sleepBuckets.has(band)).map((band) => {
+    const subset = sleepBuckets.get(band)!;
+    return { band, ...psychSegmentStats(subset) };
+  });
 
   const moodMap = new Map<string, TradePsychSlice[]>();
   for (const t of psychTrades) {
@@ -139,11 +173,58 @@ export async function GET(req: Request) {
     arr.filter((t): t is TradePsychSlice & { sleepHours: number } => t.sleepHours != null);
   const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
 
+  const stressIndices = (arr: TradePsychSlice[]) =>
+    arr
+      .map((t) => stressLevelToIndex(t.stressLevel))
+      .filter((v): v is number => v != null);
+
+  const fragileSubset = psychTrades.filter(
+    (t) => t.stressLevel === "high" && t.energyLevel != null && t.energyLevel <= 2
+  );
+  const fragileState = psychSegmentStats(fragileSubset);
+
+  const stressEnergyMap = new Map<string, TradePsychSlice[]>();
+  for (const t of psychTrades) {
+    if (t.stressLevel !== "low" && t.stressLevel !== "medium" && t.stressLevel !== "high") continue;
+    if (t.energyLevel == null) continue;
+    const key = `${t.stressLevel}\t${t.energyLevel}`;
+    if (!stressEnergyMap.has(key)) stressEnergyMap.set(key, []);
+    stressEnergyMap.get(key)!.push(t);
+  }
+  const stressEnergyGrid = Array.from(stressEnergyMap.entries())
+    .map(([key, subset]) => {
+      const [stressLevel, energyStr] = key.split("\t");
+      const energy = Number(energyStr);
+      return { stressLevel, energy, ...psychSegmentStats(subset) };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  const energyForHighlight = byEnergy
+    .filter((r) => r.count >= SEGMENT_HIGHLIGHT_MIN)
+    .map((r) => ({ energy: r.energy, avgPnl: r.avgPnl, count: r.count }));
+  const stressForHighlight = byStress
+    .filter((r) => r.count >= SEGMENT_HIGHLIGHT_MIN)
+    .map((r) => ({ level: r.level, avgPnl: r.avgPnl, count: r.count }));
+  const eHw = pickBestWorstEnergy(energyForHighlight);
+  const sHw = pickBestWorstStress(stressForHighlight);
+  const segmentHighlights = {
+    bestEnergy:
+      eHw.best != null ? { energy: eHw.best.energy, avgPnl: eHw.best.avgPnl, count: eHw.best.count } : null,
+    worstEnergy:
+      eHw.worst != null ? { energy: eHw.worst.energy, avgPnl: eHw.worst.avgPnl, count: eHw.worst.count } : null,
+    bestStress:
+      sHw.best != null ? { level: sHw.best.level, avgPnl: sHw.best.avgPnl, count: sHw.best.count } : null,
+    worstStress:
+      sHw.worst != null ? { level: sHw.worst.level, avgPnl: sHw.worst.avgPnl, count: sHw.worst.count } : null,
+  };
+
   const psychInsights = {
     avgEnergyWins: avg(withEnergy(psychWinTrades).map((t) => t.energyLevel)),
     avgEnergyLosses: avg(withEnergy(psychLossTrades).map((t) => t.energyLevel)),
     avgSleepWins: avg(withSleep(psychWinTrades).map((t) => t.sleepHours)),
     avgSleepLosses: avg(withSleep(psychLossTrades).map((t) => t.sleepHours)),
+    avgStressIndexWins: avg(stressIndices(psychWinTrades)),
+    avgStressIndexLosses: avg(stressIndices(psychLossTrades)),
   };
 
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl - t.fees, 0);
@@ -348,6 +429,9 @@ export async function GET(req: Request) {
       bySleepBand,
       byMoodTag,
       insights: psychInsights,
+      fragileState,
+      stressEnergyGrid,
+      segmentHighlights,
     },
   });
 }

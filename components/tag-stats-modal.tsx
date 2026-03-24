@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 
 type Stats = {
   tag: string;
@@ -19,6 +21,8 @@ export function TagStatsModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const lang = useAppLanguage();
+  const tm = dashboardT(lang).tagModal;
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -61,24 +65,24 @@ export function TagStatsModal({
         >
           ×
         </button>
-        <h2 className="text-lg font-semibold text-white pr-8 mb-1">Паттерн / тег</h2>
+        <h2 className="text-lg font-semibold text-white pr-8 mb-1">{tm.title}</h2>
         <p className="text-sm text-blue-400 font-mono mb-4">{displayTag}</p>
-        {loading && <p className="text-slate-400 text-sm">Загрузка…</p>}
+        {loading && <p className="text-slate-400 text-sm">{tm.loading}</p>}
         {err && <p className="text-red-400 text-sm">{err}</p>}
         {!loading && !err && stats && (
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-slate-500">Сделок</dt>
+              <dt className="text-slate-500">{tm.trades}</dt>
               <dd className="text-white font-medium text-lg">{stats.tradesCount}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Winrate</dt>
+              <dt className="text-slate-500">{tm.winRate}</dt>
               <dd className="text-emerald-400 font-medium text-lg">
                 {stats.tradesCount ? `${stats.winRate.toFixed(1)}%` : "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Profit Factor</dt>
+              <dt className="text-slate-500">{tm.pf}</dt>
               <dd className="text-white font-medium text-lg">
                 {stats.profitFactor != null && Number.isFinite(stats.profitFactor)
                   ? stats.profitFactor.toFixed(2)
@@ -88,7 +92,7 @@ export function TagStatsModal({
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Суммарный P&amp;L</dt>
+              <dt className="text-slate-500">{tm.totalPnl}</dt>
               <dd
                 className={`font-medium text-lg ${
                   stats.totalPnl >= 0 ? "text-emerald-400" : "text-red-400"

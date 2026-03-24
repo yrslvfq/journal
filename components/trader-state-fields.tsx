@@ -1,6 +1,7 @@
 "use client";
 
-const MOOD_PRESETS = ["FOMO", "Tilt", "Спокойствие", "Calm", "Focus", "Fatigue"] as const;
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 
 export type TraderStateValues = {
   energyLevel: number | null;
@@ -15,15 +16,18 @@ type Props = {
 };
 
 export function TraderStateFields({ value, onChange }: Props) {
+  const lang = useAppLanguage();
+  const ts = dashboardT(lang).traderState;
+  const moodPresets = [...dashboardT(lang).traderMoodPresets];
   const energy = value.energyLevel ?? 3;
 
   return (
     <div className="rounded-2xl border border-slate-700/80 bg-slate-800/40 p-5 space-y-6">
-      <h2 className="text-sm font-semibold text-white tracking-wide">Состояние трейдера</h2>
+      <h2 className="text-sm font-semibold text-white tracking-wide">{ts.sectionTitle}</h2>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-zinc-300">Уровень энергии (1–5)</span>
+          <span className="text-sm text-zinc-300">{ts.energy}</span>
           <span className="text-sm font-mono text-blue-400">{energy}</span>
         </div>
         <div className="flex gap-2">
@@ -46,7 +50,7 @@ export function TraderStateFields({ value, onChange }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm text-zinc-300 mb-2">Качество сна (часы)</label>
+        <label className="block text-sm text-zinc-300 mb-2">{ts.sleep}</label>
         <input
           type="range"
           min={0}
@@ -57,22 +61,22 @@ export function TraderStateFields({ value, onChange }: Props) {
           className="w-full accent-blue-500"
         />
         <div className="flex justify-between text-xs text-slate-500 mt-1">
-          <span>0 ч</span>
+          <span>{ts.sleep0}</span>
           <span className="text-slate-300 font-mono">
-            {value.sleepHours === "" ? "—" : `${value.sleepHours} ч`}
+            {value.sleepHours === "" ? "—" : `${value.sleepHours} ${lang === "ru" ? "ч" : "h"}`}
           </span>
-          <span>12 ч</span>
+          <span>{ts.sleep12}</span>
         </div>
       </div>
 
       <div>
-        <span className="block text-sm text-zinc-300 mb-2">Уровень стресса</span>
+        <span className="block text-sm text-zinc-300 mb-2">{ts.stress}</span>
         <div className="flex flex-wrap gap-2">
           {(
             [
-              { key: "low", label: "Низкий" },
-              { key: "medium", label: "Средний" },
-              { key: "high", label: "Высокий" },
+              { key: "low" as const, label: ts.stressLow },
+              { key: "medium" as const, label: ts.stressMed },
+              { key: "high" as const, label: ts.stressHigh },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -97,9 +101,9 @@ export function TraderStateFields({ value, onChange }: Props) {
       </div>
 
       <div>
-        <span className="block text-sm text-zinc-300 mb-2">Тег состояния</span>
+        <span className="block text-sm text-zinc-300 mb-2">{ts.moodTag}</span>
         <div className="flex flex-wrap gap-2 mb-3">
-          {MOOD_PRESETS.map((m) => (
+          {moodPresets.map((m) => (
             <button
               key={m}
               type="button"
@@ -118,7 +122,7 @@ export function TraderStateFields({ value, onChange }: Props) {
           type="text"
           value={value.stateMoodTag}
           onChange={(e) => onChange({ ...value, stateMoodTag: e.target.value })}
-          placeholder="Свой тег…"
+          placeholder={ts.moodPlaceholder}
           className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white text-sm"
         />
       </div>

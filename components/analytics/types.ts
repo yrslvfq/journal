@@ -1,3 +1,5 @@
+import type { SleepBandId } from "@/lib/analytics-psych";
+
 export type AnalyticsPeriod = "day" | "week" | "month" | "year" | "all" | "custom";
 
 export type AnalyticsTabId =
@@ -16,19 +18,43 @@ export type PsychSegmentRow = {
   winRate: number;
   totalPnl: number;
   avgPnl: number;
+  totalRisk: number;
+  expectancyPerRisk: number | null;
 };
 
+export type PsychFieldCoverage = { count: number; percent: number };
+
 export type AnalyticsPsychDto = {
-  coverage: { total: number; withAny: number; percent: number };
-  byStress: (PsychSegmentRow & { level: string; label: string })[];
+  coverage: {
+    total: number;
+    withAny: number;
+    percent: number;
+    byField: {
+      energy: PsychFieldCoverage;
+      sleep: PsychFieldCoverage;
+      stress: PsychFieldCoverage;
+      mood: PsychFieldCoverage;
+    };
+  };
+  byStress: (PsychSegmentRow & { level: string })[];
   byEnergy: (PsychSegmentRow & { energy: number })[];
-  bySleepBand: (PsychSegmentRow & { band: string })[];
+  bySleepBand: (PsychSegmentRow & { band: SleepBandId })[];
   byMoodTag: (PsychSegmentRow & { tag: string })[];
   insights: {
     avgEnergyWins: number | null;
     avgEnergyLosses: number | null;
     avgSleepWins: number | null;
     avgSleepLosses: number | null;
+    avgStressIndexWins: number | null;
+    avgStressIndexLosses: number | null;
+  };
+  fragileState: PsychSegmentRow;
+  stressEnergyGrid: (PsychSegmentRow & { stressLevel: string; energy: number })[];
+  segmentHighlights: {
+    bestEnergy: { energy: number; avgPnl: number; count: number } | null;
+    worstEnergy: { energy: number; avgPnl: number; count: number } | null;
+    bestStress: { level: string; avgPnl: number; count: number } | null;
+    worstStress: { level: string; avgPnl: number; count: number } | null;
   };
 };
 

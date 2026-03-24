@@ -13,6 +13,8 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { utilizationSeverity } from "@/lib/prop-guard";
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 
 type Metrics = {
   distanceToLiquidationUsd: number;
@@ -55,12 +57,14 @@ function RiskBar({
   utilization,
   usedLabel,
   limitLabel,
+  formatLimitUse,
 }: {
   label: string;
   sub?: string;
   utilization: number;
   usedLabel: string;
   limitLabel: string;
+  formatLimitUse: (pct: string) => string;
 }) {
   const pct = Math.min(100, utilization * 100);
   return (
@@ -82,9 +86,7 @@ function RiskBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-xs text-slate-500">
-        Использование лимита: {pct.toFixed(1)}%
-      </p>
+      <p className="text-xs text-slate-500">{formatLimitUse(pct.toFixed(1))}</p>
     </div>
   );
 }
@@ -105,6 +107,8 @@ function buildCurveWithoutTopWins(start: number, points: CurvePoint[], n: number
 }
 
 export default function PropGuardPage() {
+  const lang = useAppLanguage();
+  const pg = dashboardT(lang).propGuard;
   const [data, setData] = useState<ApiPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [whatIf, setWhatIf] = useState(false);
@@ -123,7 +127,7 @@ export default function PropGuardPage() {
     const j = await res.json();
     setLoading(false);
     if (!res.ok) {
-      toast.error(j.error || "Failed to load");
+      toast.error(j.error || pg.loadErr);
       return;
     }
     setData(j);
@@ -135,7 +139,7 @@ export default function PropGuardPage() {
         maxTrailingDrawdownPercent: String(j.settings.maxTrailingDrawdownPercent),
       });
     }
-  }, [day]);
+  }, [day, lang]);
 
   useEffect(() => {
     load();
@@ -159,10 +163,10 @@ export default function PropGuardPage() {
     const j = await res.json();
     setSaving(false);
     if (!res.ok) {
-      toast.error(j.error || "Save failed");
+      toast.error(j.error || pg.saveFailed);
       return;
     }
-    toast.success("Сохранено");
+    toast.success(pg.saved);
     load();
   }
 
@@ -186,15 +190,13 @@ export default function PropGuardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link href="/dashboard" className="text-slate-500 hover:text-white transition text-sm">
-            ← Dashboard
+            {pg.backDash}
           </Link>
           <h1 className="text-3xl font-bold text-white mt-2">Prop Guard</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Контроль дневного лимита и trailing drawdown относительно пика счёта.
-          </p>
+          <p className="text-slate-500 text-sm mt-1">{pg.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500">День (UTC)</label>
+          <label className="text-xs text-slate-500">{pg.dayUtc}</label>
           <input
             type="date"
             value={day}
@@ -208,10 +210,10 @@ export default function PropGuardPage() {
         onSubmit={saveSettings}
         className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-6 space-y-4"
       >
-        <h2 className="text-sm font-semibold text-white">Параметры аккаунта</h2>
+        <h2 className="text-sm font-semibold text-white">{pg.accountParams}</h2>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Starting balance ($)</label>
+            <label className="block text-xs text-slate-500 mb-1">{pg.startingBalance}</label>
             <input
               value={form.startingBalance}
               onChange={(e) => setForm((f) => ({ ...f, startingBalance: e.target.value }))}
@@ -220,7 +222,7 @@ export default function PropGuardPage() {
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Max daily loss (%)</label>
+            <label className="block text-xs text-slate-500 mb-1">{pg.maxDailyPct}</label>
             <input
               value={form.maxDailyLossPercent}
               onChange={(e) => setForm((f) => ({ ...f, maxDailyLossPercent: e.target.value }))}
@@ -229,16 +231,16 @@ export default function PropGuardPage() {
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Max daily loss ($ cap, optional)</label>
+            <label className="block text-xs text-slate-500 mb-1">{pg.maxDailyUsd}</label>
             <input
               value={form.maxDailyLossUsd}
               onChange={(e) => setForm((f) => ({ ...f, maxDailyLossUsd: e.target.value }))}
-              placeholder="Пусто = только %"
+              placeholder={pg.maxDailyUsdPh}
               className="w-full px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Max trailing DD (% от пика)</label>
+            <label className="block text-xs text-slate-500 mb-1">{pg.maxTrail}</label>
             <input
               value={form.maxTrailingDrawdownPercent}
               onChange={(e) => setForm((f) => ({ ...f, maxTrailingDrawdownPercent: e.target.value }))}
@@ -252,28 +254,26 @@ export default function PropGuardPage() {
           disabled={saving}
           className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-500 disabled:opacity-50"
         >
-          {saving ? "Сохранение…" : "Сохранить"}
+          {saving ? pg.saving : pg.save}
         </button>
         {!data?.configured && (
-          <p className="text-xs text-amber-500/90">
-            Параметры ещё не сохранялись в базе — отображаются расчёты с подставленными значениями формы.
-          </p>
+          <p className="text-xs text-amber-500/90">{pg.notSavedHint}</p>
         )}
       </form>
 
       {loading || !data ? (
-        <p className="text-slate-500">Загрузка…</p>
+        <p className="text-slate-500">{pg.loading}</p>
       ) : (
         <>
           <div className="grid sm:grid-cols-3 gap-4">
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Текущий баланс</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">{pg.balance}</p>
               <p className="text-2xl font-semibold text-white tabular-nums">
                 ${data.currentBalance.toFixed(2)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">P&amp;L за выбранный день</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">{pg.dayPnl}</p>
               <p
                 className={`text-2xl font-semibold tabular-nums ${
                   data.todayNetPnl >= 0 ? "text-emerald-400" : "text-red-400"
@@ -284,36 +284,38 @@ export default function PropGuardPage() {
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">
-                Distance to liquidation
-              </p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider">{pg.distLiq}</p>
               <p className="text-2xl font-semibold text-amber-400 tabular-nums">
                 ${data.metrics.distanceToLiquidationUsd.toFixed(2)}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Мин. из остатка по дневке и trailing.</p>
+              <p className="text-xs text-slate-500 mt-1">{pg.distLiqHint}</p>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6 space-y-8">
             <RiskBar
-              label="Дневной лимит убытка"
-              sub="Считается от убытка за выбранный календарный день (UTC)."
+              label={pg.dailyBar}
+              sub={pg.dailyBarSub}
               utilization={data.metrics.dailyUtilization}
               usedLabel={`$${data.metrics.dailyLossUsedUsd.toFixed(2)}`}
               limitLabel={`$${data.metrics.dailyLossLimitUsd.toFixed(2)}`}
+              formatLimitUse={pg.utilization}
             />
             <RiskBar
-              label="Trailing drawdown от пика"
-              sub={`Пик эквити: $${Math.max(data.settings?.peakBalance ?? 0, data.currentBalance).toFixed(2)}`}
+              label={pg.trailBar}
+              sub={pg.trailBarSub(
+                Math.max(data.settings?.peakBalance ?? 0, data.currentBalance).toFixed(2)
+              )}
               utilization={data.metrics.trailingUtilization}
               usedLabel={`$${data.metrics.trailingDrawdownUsd.toFixed(2)}`}
               limitLabel={`$${data.metrics.trailingLimitUsd.toFixed(2)}`}
+              formatLimitUse={pg.utilization}
             />
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-              <h2 className="text-sm font-semibold text-white">Кривая эквити</h2>
+              <h2 className="text-sm font-semibold text-white">{pg.equityCurve}</h2>
               <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -321,11 +323,11 @@ export default function PropGuardPage() {
                   onChange={(e) => setWhatIf(e.target.checked)}
                   className="rounded border-slate-600"
                 />
-                What if: без 3 самых прибыльных сделок
+                {pg.whatIf}
               </label>
             </div>
             {series.length === 0 ? (
-              <p className="text-slate-500 text-sm">Нет сделок для графика.</p>
+              <p className="text-slate-500 text-sm">{pg.noCurve}</p>
             ) : (
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -339,7 +341,10 @@ export default function PropGuardPage() {
                     />
                     <Tooltip
                       contentStyle={{ background: "#0f172a", border: "1px solid #334155" }}
-                      formatter={(v: number) => [`$${v.toFixed(2)}`, whatIf ? "Equity (clean)" : "Equity"]}
+                      formatter={(v: number) => [
+                        `$${v.toFixed(2)}`,
+                        whatIf ? pg.chartTooltipEquityClean : pg.chartTooltipEquity,
+                      ]}
                     />
                     <Line
                       type="monotone"

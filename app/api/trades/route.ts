@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { assertTradeCreationAllowed } from "@/lib/kill-switch";
 import { normalizeTagName } from "@/lib/trade-tags";
 
 const createSchema = z.object({
@@ -94,11 +93,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const data = createSchema.parse(body);
-
-    const kill = await assertTradeCreationAllowed(prisma, session.user.id, data.date);
-    if (!kill.ok) {
-      return NextResponse.json({ error: kill.message }, { status: 403 });
-    }
 
     const pnl =
       data.outcome === "win" ? data.risk * data.rr : data.outcome === "loss" ? -data.risk : 0;

@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { SkeletonTradeDetail } from "@/components/ui/skeleton";
 import { TradeNotesWiki } from "@/components/trade-notes-wiki";
 import { TagStatsModal } from "@/components/tag-stats-modal";
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT, stressLevelLabel } from "@/lib/i18n/dashboard";
 
 type TradeImage = { id: string; url: string; caption: string | null };
 type Trade = {
@@ -43,6 +45,8 @@ type SimilarRow = {
 };
 
 export default function TradeDetailPage() {
+  const lang = useAppLanguage();
+  const td = dashboardT(lang).tradeDetail;
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -123,9 +127,9 @@ export default function TradeDetailPage() {
       .then((data) => {
         setSimilar(data.similar || []);
       })
-      .catch(() => toast.error("Не удалось загрузить похожие сделки"))
+      .catch(() => toast.error(dashboardT(lang).tradeDetail.similarToastErr))
       .finally(() => setSimilarLoading(false));
-  }, [id]);
+  }, [id, lang]);
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -318,29 +322,33 @@ export default function TradeDetailPage() {
           trade.stressLevel ||
           trade.stateMoodTag) && (
           <div className="p-6 border-b border-slate-800/80">
-            <h2 className="text-sm font-medium text-slate-400 mb-3">Состояние трейдера</h2>
+            <h2 className="text-sm font-medium text-slate-400 mb-3">{td.psychSection}</h2>
             <div className="grid gap-4 sm:grid-cols-2 text-sm">
               {trade.energyLevel != null && (
                 <div>
-                  <p className="text-xs text-slate-500">Энергия</p>
+                  <p className="text-xs text-slate-500">{td.energy}</p>
                   <p className="text-white font-medium">{trade.energyLevel} / 5</p>
                 </div>
               )}
               {trade.sleepHours != null && (
                 <div>
-                  <p className="text-xs text-slate-500">Сон</p>
-                  <p className="text-white font-medium">{trade.sleepHours} ч</p>
+                  <p className="text-xs text-slate-500">{td.sleep}</p>
+                  <p className="text-white font-medium">
+                    {trade.sleepHours} {td.sleepUnit}
+                  </p>
                 </div>
               )}
               {trade.stressLevel && (
                 <div>
-                  <p className="text-xs text-slate-500">Стресс</p>
-                  <p className="text-white font-medium capitalize">{trade.stressLevel}</p>
+                  <p className="text-xs text-slate-500">{td.stress}</p>
+                  <p className="text-white font-medium">
+                    {stressLevelLabel(lang, trade.stressLevel)}
+                  </p>
                 </div>
               )}
               {trade.stateMoodTag && (
                 <div>
-                  <p className="text-xs text-slate-500">Тег</p>
+                  <p className="text-xs text-slate-500">{td.tag}</p>
                   <p className="text-violet-300 font-medium">{trade.stateMoodTag}</p>
                 </div>
               )}
@@ -399,18 +407,18 @@ export default function TradeDetailPage() {
         {trade.tags.length >= 2 && (
           <div className="p-6 border-t border-slate-800/80">
             <div className="flex flex-wrap items-center gap-3 mb-3">
-              <h2 className="text-sm font-medium text-slate-400">Похожие ситуации</h2>
+              <h2 className="text-sm font-medium text-slate-400">{td.similarTitle}</h2>
               <button
                 type="button"
                 onClick={loadSimilar}
                 disabled={similarLoading}
                 className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 hover:border-blue-500/40 disabled:opacity-50"
               >
-                {similarLoading ? "Поиск…" : "Показать (≥2 общих тега)"}
+                {similarLoading ? td.similarSearching : td.similarBtn}
               </button>
             </div>
             {similar && similar.length === 0 && (
-              <p className="text-slate-500 text-sm">Нет других сделок с таким пересечением тегов.</p>
+              <p className="text-slate-500 text-sm">{td.similarEmpty}</p>
             )}
             {similar && similar.length > 0 && (
               <ul className="space-y-2">

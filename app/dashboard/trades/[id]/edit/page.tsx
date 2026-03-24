@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 import {
   TraderStateFields,
   defaultTraderState,
@@ -15,6 +17,8 @@ type ConfirmationType = { id: string; name: string };
 type TradeImage = { id: string; url: string; caption: string | null };
 
 export default function EditTradePage() {
+  const lang = useAppLanguage();
+  const tf = dashboardT(lang).tradeForm;
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -525,9 +529,7 @@ export default function EditTradePage() {
           <label className="block text-sm font-medium text-zinc-300 mb-2">
             Notes
           </label>
-          <p className="text-xs text-slate-500 mb-2">
-            Связи: <code className="text-slate-400">[[trade_id]]</code>
-          </p>
+          <p className="text-xs text-slate-500 mb-2">{tf.notesWikiEdit}</p>
           <textarea
             name="notes"
             value={form.notes}
