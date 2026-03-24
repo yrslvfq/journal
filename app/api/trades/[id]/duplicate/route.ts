@@ -28,7 +28,12 @@ export async function POST(
   const today = new Date();
   today.setHours(12, 0, 0, 0);
 
-  const pnl = existing.outcome === "win" ? existing.risk * existing.rr : -existing.risk;
+  const pnl =
+    existing.outcome === "win"
+      ? existing.risk * existing.rr
+      : existing.outcome === "loss"
+      ? -existing.risk
+      : 0;
 
   const trade = await prisma.trade.create({
     data: {

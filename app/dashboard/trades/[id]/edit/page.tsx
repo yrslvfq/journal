@@ -100,7 +100,7 @@ export default function EditTradePage() {
     instrumentType: "options" as "options" | "futures" | "stocks",
     risk: "",
     rr: "2",
-    outcome: "win" as "win" | "loss",
+    outcome: "win" as "win" | "loss" | "be",
     fees: "0",
     date: "",
     marketCondition: "" as "" | "mean_reversion" | "trend" | "range",
@@ -115,7 +115,9 @@ export default function EditTradePage() {
     form.risk && parseFloat(form.risk) > 0
       ? form.outcome === "win"
         ? parseFloat(form.risk) * parseFloat(form.rr || "1")
-        : -parseFloat(form.risk)
+        : form.outcome === "loss"
+        ? -parseFloat(form.risk)
+        : 0
       : null;
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export default function EditTradePage() {
             instrumentType: t.instrumentType,
             risk: String(t.risk),
             rr: String(t.rr),
-            outcome: t.outcome as "win" | "loss",
+            outcome: t.outcome as "win" | "loss" | "be",
             fees: String(t.fees),
             date: t.date ? new Date(t.date).toISOString().slice(0, 10) : "",
             marketCondition: (t.marketCondition || "") as "" | "mean_reversion" | "trend" | "range",
@@ -339,6 +341,7 @@ export default function EditTradePage() {
             >
               <option value="win">Take profit</option>
               <option value="loss">Stop loss</option>
+              <option value="be">Break even</option>
             </select>
           </div>
           <div>

@@ -13,7 +13,7 @@ export function QuickAddTrade() {
     direction: "long" as "long" | "short",
     risk: "",
     rr: "2",
-    outcome: "win" as "win" | "loss",
+    outcome: "win" as "win" | "loss" | "be",
     date: new Date().toISOString().slice(0, 10),
   });
 
@@ -138,12 +138,13 @@ export function QuickAddTrade() {
                     <select
                       value={form.outcome}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, outcome: e.target.value as "win" | "loss" }))
+                        setForm((f) => ({ ...f, outcome: e.target.value as "win" | "loss" | "be" }))
                       }
                       className="w-full px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
                     >
                       <option value="win">Take profit</option>
                       <option value="loss">Stop loss</option>
+                      <option value="be">Break even</option>
                     </select>
                   </div>
                 </div>

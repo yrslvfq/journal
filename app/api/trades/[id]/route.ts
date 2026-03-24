@@ -10,7 +10,7 @@ const updateSchema = z.object({
   instrumentType: z.enum(["options", "futures", "stocks"]).optional(),
   risk: z.number().positive().optional(),
   rr: z.number().positive().optional(),
-  outcome: z.enum(["win", "loss"]).optional(),
+  outcome: z.enum(["win", "loss", "be"]).optional(),
   fees: z.number().optional(),
   date: z.string().optional(),
   marketCondition: z.string().optional().nullable(),
@@ -78,7 +78,7 @@ export async function PATCH(
       const risk = (data.risk ?? (existing as { risk: number }).risk) as number;
       const rr = (data.rr ?? (existing as { rr: number }).rr) as number;
       const outcome = (data.outcome ?? (existing as { outcome: string }).outcome) as string;
-      updateData.pnl = outcome === "win" ? risk * rr : -risk;
+      updateData.pnl = outcome === "win" ? risk * rr : outcome === "loss" ? -risk : 0;
     }
     if (data.fees != null) updateData.fees = data.fees;
     if (data.date != null) updateData.date = new Date(data.date + "T12:00:00Z");

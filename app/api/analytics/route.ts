@@ -61,7 +61,8 @@ export async function GET(req: Request) {
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl - t.fees, 0);
   const wins = trades.filter((t) => t.pnl > 0).length;
   const losses = trades.filter((t) => t.pnl < 0).length;
-  const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
+  const decidedTrades = wins + losses;
+  const winRate = decidedTrades > 0 ? (wins / decidedTrades) * 100 : 0;
   const avgWin =
     wins > 0
       ? trades.filter((t) => t.pnl > 0).reduce((s, t) => s + t.pnl, 0) / wins
@@ -71,13 +72,13 @@ export async function GET(req: Request) {
       ? trades.filter((t) => t.pnl < 0).reduce((s, t) => s + t.pnl, 0) / losses
       : 0;
   const expectancy =
-    trades.length > 0
+    decidedTrades > 0
       ? (winRate / 100) * avgWin + ((100 - winRate) / 100) * avgLoss
       : 0;
 
   const grossProfit = trades.filter((t) => t.pnl > 0).reduce((s, t) => s + t.pnl - t.fees, 0);
   const grossLoss = Math.abs(
-    trades.filter((t) => t.pnl <= 0).reduce((s, t) => s + t.pnl - t.fees, 0)
+    trades.filter((t) => t.pnl < 0).reduce((s, t) => s + t.pnl - t.fees, 0)
   );
   const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
 
@@ -87,14 +88,18 @@ export async function GET(req: Request) {
   let maxLossStreak = 0;
   for (const t of trades) {
     const isWin = t.pnl - t.fees > 0;
+    const isLoss = t.pnl - t.fees < 0;
     if (isWin) {
       currentWinStreak += 1;
       currentLossStreak = 0;
       maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-    } else {
+    } else if (isLoss) {
       currentLossStreak += 1;
       currentWinStreak = 0;
       maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
+    } else {
+      currentWinStreak = 0;
+      currentLossStreak = 0;
     }
   }
 

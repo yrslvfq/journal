@@ -329,7 +329,11 @@ function TradeModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
                 <div>
                   <p className="text-slate-500 text-xs uppercase tracking-wider">Outcome</p>
                   <p className="text-white">
-                    {trade.outcome === "win" ? "Take profit" : "Stop loss"}
+                    {trade.outcome === "win"
+                      ? "Take profit"
+                      : trade.outcome === "loss"
+                      ? "Stop loss"
+                      : "Break even"}
                   </p>
                 </div>
               </div>

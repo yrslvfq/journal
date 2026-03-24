@@ -24,7 +24,7 @@ export default function NewTradePage() {
     instrumentType: "options" as "options" | "futures" | "stocks",
     risk: "",
     rr: "2",
-    outcome: "win" as "win" | "loss",
+    outcome: "win" as "win" | "loss" | "be",
     fees: "0",
     date: new Date().toISOString().slice(0, 10),
     marketCondition: "" as "" | "mean_reversion" | "trend" | "range",
@@ -39,7 +39,9 @@ export default function NewTradePage() {
     form.risk && parseFloat(form.risk) > 0
       ? form.outcome === "win"
         ? parseFloat(form.risk) * parseFloat(form.rr || "1")
-        : -parseFloat(form.risk)
+        : form.outcome === "loss"
+        ? -parseFloat(form.risk)
+        : 0
       : null;
 
   useEffect(() => {
@@ -274,6 +276,7 @@ export default function NewTradePage() {
             >
               <option value="win">Take profit</option>
               <option value="loss">Stop loss</option>
+              <option value="be">Break even</option>
             </select>
           </div>
           <div>
@@ -303,7 +306,9 @@ export default function NewTradePage() {
             </span>
             {form.outcome === "win"
               ? ` (Risk × R:R = ${form.risk} × ${form.rr})`
-              : ` (Loss = Risk)`}
+              : form.outcome === "loss"
+              ? ` (Loss = Risk)`
+              : ` (Break-even)`}
           </p>
         )}
 

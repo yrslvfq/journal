@@ -275,7 +275,11 @@ export default function TradeDetailPage() {
           <div>
             <p className="text-xs text-slate-500 uppercase tracking-wider">Outcome</p>
             <p className="text-white">
-              {trade.outcome === "win" ? "Take profit" : "Stop loss"}
+              {trade.outcome === "win"
+                ? "Take profit"
+                : trade.outcome === "loss"
+                ? "Stop loss"
+                : "Break even"}
             </p>
           </div>
           <div>

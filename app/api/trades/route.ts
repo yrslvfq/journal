@@ -10,7 +10,7 @@ const createSchema = z.object({
   instrumentType: z.enum(["options", "futures", "stocks"]),
   risk: z.number().positive(),
   rr: z.number().positive(), // risk:reward ratio, e.g. 2 = 1:2
-  outcome: z.enum(["win", "loss"]), // win = TP hit, loss = SL hit
+  outcome: z.enum(["win", "loss", "be"]), // win = TP, loss = SL, be = break-even
   fees: z.number().default(0),
   date: z.string(), // YYYY-MM-DD
   marketCondition: z.string().optional().nullable(),
@@ -88,7 +88,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const data = createSchema.parse(body);
-    const pnl = data.outcome === "win" ? data.risk * data.rr : -data.risk;
+    const pnl =
+      data.outcome === "win" ? data.risk * data.rr : data.outcome === "loss" ? -data.risk : 0;
 
     const trade = await prisma.trade.create({
       data: {
