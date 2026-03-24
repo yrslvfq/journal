@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -12,54 +13,44 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { AnalyticsHubTabs } from "@/components/analytics/hub-tabs";
+import { AnalyticsPeriodFilters } from "@/components/analytics/period-filters";
+import { AnalyticsTabPlaceholder } from "@/components/analytics/tab-placeholder";
 import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton";
+import { AnalyticsDto, AnalyticsPeriod, AnalyticsTabId } from "@/components/analytics/types";
 
-type Analytics = {
-  summary: {
-    totalPnl: number;
-    tradesCount: number;
-    wins: number;
-    losses: number;
-    winRate: number;
-    avgWin: number;
-    avgLoss: number;
-    expectancy: number;
-    profitFactor?: number;
-    maxDrawdown?: number;
-    currentWinStreak?: number;
-    currentLossStreak?: number;
-    maxWinStreak?: number;
-    maxLossStreak?: number;
-    avgTrade?: number | null;
-    medianTrade?: number | null;
-    stdDevPnl?: number | null;
-    sharpeRatio?: number | null;
-    payoffRatio?: number | null;
-    recoveryFactor?: number | null;
-    calmarRatio?: number | null;
-    bestTrade?: number | null;
-    worstTrade?: number | null;
-    breakevenCount?: number | null;
-    expectancyPerRisk?: number | null;
-    totalRisk?: number | null;
-    tradesPerDay?: number | null;
-  };
-  bySymbol: { symbol: string; pnl: number; count: number }[];
-  bySetup: { id: string; name: string; pnl: number; count: number }[];
-  byConfirmation: { id: string; name: string; pnl: number; count: number }[];
-  dailyPnl: { date: string; pnl: number }[];
-  cumulativeData: { date: string; pnl: number; cumulative: number }[];
-  drawdownData?: { date: string; cumulative: number; drawdown: number }[];
-};
+const HUB_TABS: { id: AnalyticsTabId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "funnel", label: "Funnel" },
+  { id: "risk", label: "Risk" },
+  { id: "segments", label: "Segments" },
+  { id: "time-patterns", label: "Time Patterns" },
+  { id: "quality", label: "Quality" },
+];
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<Analytics | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [data, setData] = useState<AnalyticsDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("month");
+  const [period, setPeriod] = useState<AnalyticsPeriod>("month");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const tabParam = searchParams.get("tab");
+  const activeTab: AnalyticsTabId = HUB_TABS.some((t) => t.id === tabParam)
+    ? (tabParam as AnalyticsTabId)
+    : "overview";
 
   const canFetch = period !== "custom" || (dateFrom && dateTo);
+  const exportHref = `/api/analytics/export?period=${period}${
+    period === "custom" && dateFrom && dateTo ? `&dateFrom=${dateFrom}&dateTo=${dateTo}` : ""
+  }`;
+
+  const handleTabChange = (tab: AnalyticsTabId) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    router.replace(`/dashboard/analytics?${params.toString()}`);
+  };
 
   useEffect(() => {
     if (!canFetch) {
@@ -83,10 +74,18 @@ export default function AnalyticsPage() {
   if (loading && canFetch) {
     return (
       <div className="space-y-8">
-        <div className="flex justify-between">
-          <h1 className="text-3xl font-bold text-white">Analytics</h1>
-          <div className="h-10 w-32 rounded-xl bg-slate-800/60 animate-pulse" />
-        </div>
+        <h1 className="text-3xl font-bold text-white">Analytics Hub</h1>
+        <AnalyticsPeriodFilters
+          period={period}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onPeriodChange={setPeriod}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          exportHref={exportHref}
+          canFetch={canFetch}
+        />
+        <AnalyticsHubTabs tabs={HUB_TABS} activeTab={activeTab} onChange={handleTabChange} />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           {[...Array(6)].map((_, i) => (
             <SkeletonCard key={i} />
@@ -107,38 +106,49 @@ export default function AnalyticsPage() {
   if (period === "custom" && !canFetch) {
     return (
       <div className="space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold text-white">Analytics</h1>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white"
-            >
-              <option value="day">Today</option>
-              <option value="week">This week</option>
-              <option value="month">This month</option>
-              <option value="year">This year</option>
-              <option value="all">All time</option>
-              <option value="custom">Custom range</option>
-            </select>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white"
-            />
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold text-white">Analytics Hub</h1>
+        <AnalyticsPeriodFilters
+          period={period}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onPeriodChange={setPeriod}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          exportHref={exportHref}
+          canFetch={canFetch}
+        />
+        <AnalyticsHubTabs tabs={HUB_TABS} activeTab={activeTab} onChange={handleTabChange} />
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-12 text-center text-slate-500">
           Select date range to view analytics
         </div>
+      </div>
+    );
+  }
+
+  if (activeTab !== "overview") {
+    const tabDescriptions: Record<Exclude<AnalyticsTabId, "overview">, string> = {
+      funnel: "Conversion-focused metrics and setup/confirmation efficiency will be placed here.",
+      risk: "Drawdown, limit breaches, and streak-risk controls will be placed here.",
+      segments: "Segment-level performance by symbol, market condition, and tags will be placed here.",
+      "time-patterns": "Day-of-week, hour, and session behavior analysis will be placed here.",
+      quality: "Execution quality and discipline indicators will be placed here.",
+    };
+    const tabLabel = HUB_TABS.find((tab) => tab.id === activeTab)?.label ?? "Tab";
+    return (
+      <div className="space-y-8">
+        <h1 className="text-3xl font-bold text-white">Analytics Hub</h1>
+        <AnalyticsPeriodFilters
+          period={period}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onPeriodChange={setPeriod}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          exportHref={exportHref}
+          canFetch={canFetch}
+        />
+        <AnalyticsHubTabs tabs={HUB_TABS} activeTab={activeTab} onChange={handleTabChange} />
+        <AnalyticsTabPlaceholder title={tabLabel} description={tabDescriptions[activeTab]} />
       </div>
     );
   }
@@ -151,52 +161,18 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold text-white">Analytics</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <a
-            href={
-              canFetch
-                ? `/api/analytics/export?period=${period}${period === "custom" && dateFrom && dateTo ? `&dateFrom=${dateFrom}&dateTo=${dateTo}` : ""}`
-                : "#"
-            }
-            className="px-4 py-2 rounded-xl bg-slate-700/80 text-white hover:bg-slate-600/80 transition text-sm disabled:opacity-50"
-            onClick={(e) => !canFetch && e.preventDefault()}
-          >
-            Export CSV
-          </a>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white focus:ring-2 focus:ring-blue-500/50"
-          >
-            <option value="day">Today</option>
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-            <option value="year">This year</option>
-            <option value="all">All time</option>
-            <option value="custom">Custom range</option>
-          </select>
-          {period === "custom" && (
-            <>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white focus:ring-2 focus:ring-blue-500/50"
-                placeholder="From"
-              />
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white focus:ring-2 focus:ring-blue-500/50"
-                placeholder="To"
-              />
-            </>
-          )}
-        </div>
-      </div>
+      <h1 className="text-3xl font-bold text-white">Analytics Hub</h1>
+      <AnalyticsPeriodFilters
+        period={period}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onPeriodChange={setPeriod}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        exportHref={exportHref}
+        canFetch={canFetch}
+      />
+      <AnalyticsHubTabs tabs={HUB_TABS} activeTab={activeTab} onChange={handleTabChange} />
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-5">

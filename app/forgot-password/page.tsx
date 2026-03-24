@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
             <div className="text-emerald-400 text-sm text-center space-y-1">
               <p>{message}</p>
               <p className="text-slate-400">
-                If you don't see the email, please check your Spam folder.
+                If you don&apos;t see the email, please check your Spam folder.
               </p>
             </div>
           )}
