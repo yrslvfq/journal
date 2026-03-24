@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  psychSegmentStats,
+  sleepBand,
+  tradeNet,
+  type TradePsychSlice,
+} from "@/lib/analytics-psych";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -54,9 +60,91 @@ export async function GET(req: Request) {
       tags: { select: { name: true } },
       setups: { include: { setupType: true } },
       confirmations: { include: { confirmationType: true } },
+      energyLevel: true,
+      sleepHours: true,
+      stressLevel: true,
+      stateMoodTag: true,
     },
     orderBy: { date: "asc" },
   });
+
+  const psychTrades: TradePsychSlice[] = trades;
+
+  const withAnyPsych = psychTrades.filter(
+    (t) =>
+      t.energyLevel != null ||
+      t.sleepHours != null ||
+      !!t.stressLevel ||
+      !!(t.stateMoodTag && t.stateMoodTag.trim())
+  );
+  const psychCoverage = {
+    total: psychTrades.length,
+    withAny: withAnyPsych.length,
+    percent: psychTrades.length > 0 ? (withAnyPsych.length / psychTrades.length) * 100 : 0,
+  };
+
+  const stressLabels: Record<string, string> = {
+    low: "Низкий",
+    medium: "Средний",
+    high: "Высокий",
+  };
+  const byStress = (["low", "medium", "high"] as const).map((level) => {
+    const subset = psychTrades.filter((t) => t.stressLevel === level);
+    const s = psychSegmentStats(subset);
+    return {
+      level,
+      label: stressLabels[level],
+      ...s,
+    };
+  });
+
+  const byEnergy = [1, 2, 3, 4, 5].map((energy) => {
+    const subset = psychTrades.filter((t) => t.energyLevel === energy);
+    const s = psychSegmentStats(subset);
+    return { energy, ...s };
+  });
+
+  const sleepBuckets = new Map<string, TradePsychSlice[]>();
+  for (const t of psychTrades) {
+    if (t.sleepHours == null) continue;
+    const band = sleepBand(t.sleepHours);
+    if (!sleepBuckets.has(band)) sleepBuckets.set(band, []);
+    sleepBuckets.get(band)!.push(t);
+  }
+  const sleepOrder = ["< 6 ч", "6–7 ч", "7–8 ч", "≥ 8 ч"];
+  const bySleepBand = sleepOrder
+    .filter((band) => sleepBuckets.has(band))
+    .map((band) => {
+      const subset = sleepBuckets.get(band)!;
+      return { band, ...psychSegmentStats(subset) };
+    });
+
+  const moodMap = new Map<string, TradePsychSlice[]>();
+  for (const t of psychTrades) {
+    const tag = t.stateMoodTag?.trim();
+    if (!tag) continue;
+    if (!moodMap.has(tag)) moodMap.set(tag, []);
+    moodMap.get(tag)!.push(t);
+  }
+  const byMoodTag = Array.from(moodMap.entries())
+    .map(([tag, subset]) => ({ tag, ...psychSegmentStats(subset) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 16);
+
+  const psychWinTrades = psychTrades.filter((t) => tradeNet(t) > 0);
+  const psychLossTrades = psychTrades.filter((t) => tradeNet(t) < 0);
+  const withEnergy = (arr: TradePsychSlice[]) =>
+    arr.filter((t): t is TradePsychSlice & { energyLevel: number } => t.energyLevel != null);
+  const withSleep = (arr: TradePsychSlice[]) =>
+    arr.filter((t): t is TradePsychSlice & { sleepHours: number } => t.sleepHours != null);
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+
+  const psychInsights = {
+    avgEnergyWins: avg(withEnergy(psychWinTrades).map((t) => t.energyLevel)),
+    avgEnergyLosses: avg(withEnergy(psychLossTrades).map((t) => t.energyLevel)),
+    avgSleepWins: avg(withSleep(psychWinTrades).map((t) => t.sleepHours)),
+    avgSleepLosses: avg(withSleep(psychLossTrades).map((t) => t.sleepHours)),
+  };
 
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl - t.fees, 0);
   const wins = trades.filter((t) => t.pnl > 0).length;
@@ -253,5 +341,13 @@ export async function GET(req: Request) {
     dailyPnl: dailyData,
     cumulativeData,
     drawdownData,
+    psych: {
+      coverage: psychCoverage,
+      byStress,
+      byEnergy,
+      bySleepBand,
+      byMoodTag,
+      insights: psychInsights,
+    },
   });
 }

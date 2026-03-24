@@ -2,6 +2,7 @@ import { AnalyticsDto, AnalyticsTabId } from "@/components/analytics/types";
 import {
   FunnelTab,
   OverviewTab,
+  PsychTab,
   QualityTab,
   RiskTab,
   SegmentsTab,
@@ -15,7 +16,7 @@ type Props = {
 };
 
 export function AnalyticsTabContent({ activeTab, data }: Props) {
-  const { summary, bySymbol, bySetup, byConfirmation, dailyPnl, cumulativeData, drawdownData } = data;
+  const { summary, bySymbol, bySetup, byConfirmation, dailyPnl, cumulativeData, drawdownData, psych } = data;
   const totalTrades = summary.tradesCount || 0;
   const breakevenCount = summary.breakevenCount ?? Math.max(0, totalTrades - summary.wins - summary.losses);
   const rrEstimate = summary.avgLoss ? Math.abs(summary.avgWin / summary.avgLoss) : null;
@@ -63,6 +64,7 @@ export function AnalyticsTabContent({ activeTab, data }: Props) {
     dailyPnl,
     cumulativeData,
     drawdownData,
+    psych,
     totalTrades,
     breakevenCount,
     rrEstimate,
@@ -80,5 +82,6 @@ export function AnalyticsTabContent({ activeTab, data }: Props) {
   if (activeTab === "segments") return <SegmentsTab vm={vm} />;
   if (activeTab === "time-patterns") return <TimePatternsTab vm={vm} />;
   if (activeTab === "quality") return <QualityTab vm={vm} />;
+  if (activeTab === "psych") return <PsychTab vm={vm} />;
   return <OverviewTab vm={vm} />;
 }

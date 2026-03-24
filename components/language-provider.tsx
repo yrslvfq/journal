@@ -1,41 +1,20 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useSyncDocumentLang, useAppLanguage, setAppLanguage } from "@/lib/app-language";
 
-export type AppLanguage = "en" | "ru";
+export type { AppLanguage } from "@/lib/app-language";
 
-type LanguageContextValue = {
-  language: AppLanguage;
-  setLanguage: (lang: AppLanguage) => void;
-};
-
-const LanguageContext = createContext<LanguageContextValue | null>(null);
-
-const STORAGE_KEY = "app-language";
-
+/**
+ * Wraps dashboard: syncs <html lang> with stored preference and exposes legacy hook API.
+ */
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<AppLanguage>("en");
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "ru" || stored === "en") setLanguageState(stored);
-  }, []);
-
-  const setLanguage = (lang: AppLanguage) => {
-    setLanguageState(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
-    window.dispatchEvent(new CustomEvent("app-language-changed", { detail: lang }));
-  };
-
-  const value = useMemo(() => ({ language, setLanguage }), [language]);
-
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  useSyncDocumentLang();
+  return <>{children}</>;
 }
 
 export function useLanguage() {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) {
-    throw new Error("useLanguage must be used within LanguageProvider");
-  }
-  return ctx;
+  return {
+    language: useAppLanguage(),
+    setLanguage: setAppLanguage,
+  };
 }

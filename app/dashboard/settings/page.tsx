@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLanguage } from "@/components/language-provider";
+import { useAppLanguage } from "@/lib/app-language";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 type SetupType = {
   id: string;
@@ -247,7 +248,7 @@ function EditableConfirmationItem({
 }
 
 export default function SettingsPage() {
-  const { language, setLanguage } = useLanguage();
+  const language = useAppLanguage();
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([]);
   const [confirmationTypes, setConfirmationTypes] = useState<ConfirmationType[]>(
     []
@@ -311,33 +312,16 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold text-white">Settings</h1>
 
       <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-6">
-        <h2 className="text-lg font-medium text-white mb-2">Language</h2>
+        <h2 className="text-lg font-medium text-white mb-2">
+          {language === "ru" ? "Язык" : "Language"}
+        </h2>
         <p className="text-sm text-slate-500 mb-4">
-          Choose UI language for dashboard navigation and common labels.
+          {language === "ru"
+            ? "Меняется в любой момент: сверху справа на телефоне или внизу меню. Сохраняется в этом браузере."
+            : "Change anytime: top-right on mobile or bottom of the sidebar. Saved in this browser."}
         </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setLanguage("en")}
-            className={`px-3 py-1.5 rounded-lg text-sm border transition ${
-              language === "en"
-                ? "bg-blue-600/20 text-blue-400 border-blue-500/40"
-                : "bg-slate-800/70 text-slate-300 border-slate-700/80"
-            }`}
-          >
-            English
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("ru")}
-            className={`px-3 py-1.5 rounded-lg text-sm border transition ${
-              language === "ru"
-                ? "bg-blue-600/20 text-blue-400 border-blue-500/40"
-                : "bg-slate-800/70 text-slate-300 border-slate-700/80"
-            }`}
-          >
-            Русский
-          </button>
+        <div className="max-w-xs">
+          <LanguageSwitcher size="md" />
         </div>
       </div>
 

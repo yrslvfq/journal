@@ -6,7 +6,31 @@ export type AnalyticsTabId =
   | "risk"
   | "segments"
   | "time-patterns"
-  | "quality";
+  | "quality"
+  | "psych";
+
+export type PsychSegmentRow = {
+  count: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalPnl: number;
+  avgPnl: number;
+};
+
+export type AnalyticsPsychDto = {
+  coverage: { total: number; withAny: number; percent: number };
+  byStress: (PsychSegmentRow & { level: string; label: string })[];
+  byEnergy: (PsychSegmentRow & { energy: number })[];
+  bySleepBand: (PsychSegmentRow & { band: string })[];
+  byMoodTag: (PsychSegmentRow & { tag: string })[];
+  insights: {
+    avgEnergyWins: number | null;
+    avgEnergyLosses: number | null;
+    avgSleepWins: number | null;
+    avgSleepLosses: number | null;
+  };
+};
 
 export type AnalyticsDto = {
   summary: {
@@ -44,4 +68,5 @@ export type AnalyticsDto = {
   dailyPnl: { date: string; pnl: number }[];
   cumulativeData: { date: string; pnl: number; cumulative: number }[];
   drawdownData?: { date: string; cumulative: number; drawdown: number }[];
+  psych: AnalyticsPsychDto;
 };
