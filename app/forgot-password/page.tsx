@@ -48,7 +48,12 @@ export default function ForgotPasswordPage() {
         >
           {error && <div className="text-red-400 text-sm text-center">{error}</div>}
           {message && (
-            <div className="text-emerald-400 text-sm text-center">{message}</div>
+            <div className="text-emerald-400 text-sm text-center space-y-1">
+              <p>{message}</p>
+              <p className="text-slate-400">
+                If you don't see the email, please check your Spam folder.
+              </p>
+            </div>
           )}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
