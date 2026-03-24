@@ -19,7 +19,7 @@ const nav = [
 export function DashboardNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   return (
     <>
       <button
@@ -60,7 +60,36 @@ export function DashboardNav() {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-slate-800/80">
+        <div className="p-4 border-t border-slate-800/80 space-y-3">
+          <div>
+            <p className="text-xs text-slate-500 mb-2">
+              {language === "ru" ? "Язык" : "Language"}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs border transition ${
+                  language === "en"
+                    ? "bg-blue-600/20 text-blue-400 border-blue-500/40"
+                    : "bg-slate-800/70 text-slate-300 border-slate-700/80"
+                }`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage("ru")}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs border transition ${
+                  language === "ru"
+                    ? "bg-blue-600/20 text-blue-400 border-blue-500/40"
+                    : "bg-slate-800/70 text-slate-300 border-slate-700/80"
+                }`}
+              >
+                RU
+              </button>
+            </div>
+          </div>
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="w-full text-left px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all duration-200"
