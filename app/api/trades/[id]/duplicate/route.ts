@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { assertTradeCreationAllowed } from "@/lib/kill-switch";
 
 export async function POST(
   _req: Request,
@@ -27,6 +28,14 @@ export async function POST(
 
   const today = new Date();
   today.setHours(12, 0, 0, 0);
+
+  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+    today.getDate()
+  ).padStart(2, "0")}`;
+  const kill = await assertTradeCreationAllowed(prisma, session.user.id, ymd);
+  if (!kill.ok) {
+    return NextResponse.json({ error: kill.message }, { status: 403 });
+  }
 
   const pnl =
     existing.outcome === "win"

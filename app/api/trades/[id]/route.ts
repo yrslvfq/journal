@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { normalizeTagName } from "@/lib/trade-tags";
 
 const updateSchema = z.object({
   symbol: z.string().min(1).optional(),
@@ -19,6 +20,10 @@ const updateSchema = z.object({
   tags: z.array(z.string()).optional(),
   setupIds: z.array(z.string()).optional(),
   confirmationIds: z.array(z.string()).optional(),
+  energyLevel: z.number().int().min(1).max(5).optional().nullable(),
+  sleepHours: z.number().min(0).max(24).optional().nullable(),
+  stressLevel: z.enum(["low", "medium", "high"]).optional().nullable(),
+  stateMoodTag: z.string().max(64).optional().nullable(),
 });
 
 export async function GET(
@@ -85,12 +90,21 @@ export async function PATCH(
     if (data.marketCondition !== undefined) updateData.marketCondition = data.marketCondition;
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.confirmationNotes !== undefined) updateData.confirmationNotes = data.confirmationNotes;
+    if (data.energyLevel !== undefined) updateData.energyLevel = data.energyLevel;
+    if (data.sleepHours !== undefined) updateData.sleepHours = data.sleepHours;
+    if (data.stressLevel !== undefined) updateData.stressLevel = data.stressLevel;
+    if (data.stateMoodTag !== undefined) {
+      updateData.stateMoodTag = data.stateMoodTag?.trim() || null;
+    }
 
     if (data.tags !== undefined) {
       await prisma.tradeTag.deleteMany({ where: { tradeId: id } });
-      if (data.tags.length > 0) {
+      const uniqueTags = [
+        ...new Set(data.tags.map((name) => normalizeTagName(name)).filter(Boolean)),
+      ];
+      if (uniqueTags.length > 0) {
         await prisma.tradeTag.createMany({
-          data: data.tags.map((name) => ({ tradeId: id, name })),
+          data: uniqueTags.map((name) => ({ tradeId: id, name })),
         });
       }
     }

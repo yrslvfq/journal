@@ -21,6 +21,17 @@ body {
   color: var(--foreground);
 }
 
+@keyframes prop-guard-blink {
+  50% {
+    opacity: 0.55;
+    filter: brightness(1.15);
+  }
+}
+
+.prop-guard-blink {
+  animation: prop-guard-blink 0.9s ease-in-out infinite;
+}
+
 /* Smooth focus rings */
 input:focus, select:focus, textarea:focus, button:focus-visible {
   outline: none;

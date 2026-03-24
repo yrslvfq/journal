@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { assertTradeCreationAllowed } from "@/lib/kill-switch";
+import { normalizeTagName } from "@/lib/trade-tags";
 
 const createSchema = z.object({
   symbol: z.string().min(1),
@@ -19,6 +21,10 @@ const createSchema = z.object({
   tags: z.array(z.string()).optional(),
   setupIds: z.array(z.string()).optional(),
   confirmationIds: z.array(z.string()).optional(),
+  energyLevel: z.number().int().min(1).max(5).optional().nullable(),
+  sleepHours: z.number().min(0).max(24).optional().nullable(),
+  stressLevel: z.enum(["low", "medium", "high"]).optional().nullable(),
+  stateMoodTag: z.string().max(64).optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -88,8 +94,19 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const data = createSchema.parse(body);
+
+    const kill = await assertTradeCreationAllowed(prisma, session.user.id, data.date);
+    if (!kill.ok) {
+      return NextResponse.json({ error: kill.message }, { status: 403 });
+    }
+
     const pnl =
       data.outcome === "win" ? data.risk * data.rr : data.outcome === "loss" ? -data.risk : 0;
+
+    const tagNames = (data.tags ?? [])
+      .map((name) => normalizeTagName(name))
+      .filter(Boolean);
+    const uniqueTags = [...new Set(tagNames)];
 
     const trade = await prisma.trade.create({
       data: {
@@ -106,8 +123,12 @@ export async function POST(req: Request) {
         marketCondition: data.marketCondition ?? undefined,
         notes: data.notes,
         confirmationNotes: data.confirmationNotes ?? undefined,
-        tags: data.tags?.length
-          ? { create: data.tags.map((name) => ({ name })) }
+        energyLevel: data.energyLevel ?? undefined,
+        sleepHours: data.sleepHours ?? undefined,
+        stressLevel: data.stressLevel ?? undefined,
+        stateMoodTag: data.stateMoodTag?.trim() || undefined,
+        tags: uniqueTags.length
+          ? { create: uniqueTags.map((name) => ({ name })) }
           : undefined,
         setups: data.setupIds?.length
           ? { create: data.setupIds.map((setupTypeId) => ({ setupTypeId })) }

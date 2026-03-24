@@ -22,6 +22,8 @@ model User {
   setupDescriptions    UserSetupDescription[]
   researchEntries      ResearchEntry[]
   passwordResetTokens  PasswordResetToken[]
+  propAccount          PropAccount?
+  killSwitchPause      KillSwitchPause?
 }
 
 model PasswordResetToken {
@@ -53,6 +55,10 @@ model Trade {
   marketCondition  String?   // mean_reversion | trend | range | etc
   notes            String?
   confirmationNotes String?
+  energyLevel      Int?      // 1–5 trader energy
+  sleepHours       Float?
+  stressLevel      String?   // low | medium | high
+  stateMoodTag     String?   // FOMO | Tilt | Calm | custom
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -158,4 +164,26 @@ model TradeConfirmation {
   confirmationType  ConfirmationType @relation(fields: [confirmationTypeId], references: [id], onDelete: Cascade)
 
   @@unique([tradeId, confirmationTypeId])
+}
+
+model PropAccount {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  startingBalance            Float
+  maxDailyLossPercent        Float    @default(5)
+  maxDailyLossUsd            Float?   // optional cap in account currency; if null, only % applies
+  maxTrailingDrawdownPercent Float    @default(10)
+  peakBalance                Float    // high-water equity; updated when metrics are computed
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model KillSwitchPause {
+  userId    String   @id
+  until     DateTime
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
