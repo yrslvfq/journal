@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getUploadsDir, getUploadBaseUrl } from "@/lib/uploads";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { z } from "zod";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGES_PER_TRADE = 10;
@@ -20,6 +21,12 @@ function getExt(mime: string, filename: string): string {
   const ext = path.extname(filename || "").slice(1);
   return ext && ["png", "jpg", "jpeg", "webp"].includes(ext) ? ext : "png";
 }
+
+const urlSchema = z.object({
+  url: z.string().url().refine((v) => /^https?:\/\//i.test(v), {
+    message: "Only http/https URLs are allowed",
+  }),
+});
 
 export async function POST(
   req: Request,
@@ -45,6 +52,28 @@ export async function POST(
       { error: `Maximum ${MAX_IMAGES_PER_TRADE} screenshots per trade` },
       { status: 400 }
     );
+  }
+
+  const contentType = req.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      const body = await req.json();
+      const { url } = urlSchema.parse(body);
+      const created = await prisma.tradeImage.create({
+        data: { tradeId, url, caption: null },
+      });
+      return NextResponse.json([
+        { id: created.id, url: created.url, caption: created.caption },
+      ]);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return NextResponse.json(
+          { error: e.errors.map((x) => x.message).join(", ") },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
+    }
   }
 
   let formData: FormData;

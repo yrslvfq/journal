@@ -37,6 +37,7 @@ export default function TradeDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [imageLinkInput, setImageLinkInput] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -170,6 +171,33 @@ export default function TradeDetailPage() {
       toast.success("Screenshot removed");
       refetchTrade();
     }
+  }
+
+  async function handleAddImageLink() {
+    const url = imageLinkInput.trim();
+    if (!url) return;
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("bad protocol");
+    } catch {
+      toast.error("Invalid image URL");
+      return;
+    }
+    setUploading(true);
+    const res = await fetch(`/api/trades/${id}/images`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    setUploading(false);
+    if (!res.ok) {
+      toast.error(data.error || "Failed to attach image link");
+      return;
+    }
+    setImageLinkInput("");
+    toast.success("Image link attached");
+    refetchTrade();
   }
 
   if (loading || !trade) {
@@ -403,6 +431,23 @@ export default function TradeDetailPage() {
             </div>
           )}
           {imageError && <p className="text-red-500 text-sm mb-2">{imageError}</p>}
+          <div className="flex gap-2 mb-3">
+            <input
+              value={imageLinkInput}
+              onChange={(e) => setImageLinkInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddImageLink())}
+              placeholder="https://... TradingView screenshot URL"
+              className="flex-1 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
+            />
+            <button
+              type="button"
+              onClick={handleAddImageLink}
+              disabled={uploading || (trade.images?.length ?? 0) >= 10}
+              className="px-4 py-2 rounded-xl bg-slate-700/80 text-slate-300 hover:bg-slate-600/80 disabled:opacity-50 transition text-sm"
+            >
+              Add link
+            </button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"

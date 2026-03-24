@@ -18,6 +18,8 @@ export default function NewTradePage() {
   const [setupTypes, setSetupTypes] = useState<SetupType[]>([]);
   const [confirmationTypes, setConfirmationTypes] = useState<ConfirmationType[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [pendingImageLinks, setPendingImageLinks] = useState<string[]>([]);
+  const [imageLinkInput, setImageLinkInput] = useState("");
   const [form, setForm] = useState({
     symbol: "",
     direction: "long" as "long" | "short",
@@ -62,6 +64,27 @@ export default function NewTradePage() {
   const removePendingImage = useCallback((index: number) => {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
+
+  function addImageLink() {
+    const link = imageLinkInput.trim();
+    if (!link) return;
+    try {
+      const u = new URL(link);
+      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("bad protocol");
+    } catch {
+      toast.error("Invalid image URL");
+      return;
+    }
+    setPendingImageLinks((prev) => {
+      if (prev.includes(link)) return prev;
+      return [...prev, link].slice(0, MAX_IMAGES);
+    });
+    setImageLinkInput("");
+  }
+
+  function removePendingImageLink(index: number) {
+    setPendingImageLinks((prev) => prev.filter((_, i) => i !== index));
+  }
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -158,6 +181,19 @@ export default function NewTradePage() {
         body: formData,
       });
       if (!imgRes.ok) toast.error("Trade created, but some screenshots failed to upload");
+    }
+    if (pendingImageLinks.length > 0) {
+      for (const url of pendingImageLinks) {
+        const linkRes = await fetch(`/api/trades/${tradeId}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        if (!linkRes.ok) {
+          toast.error("Trade created, but some image links failed to attach");
+          break;
+        }
+      }
     }
     setLoading(false);
     toast.success("Trade created");
@@ -433,6 +469,22 @@ export default function NewTradePage() {
           <label className="block text-sm font-medium text-zinc-300 mb-2">
             Screenshots
           </label>
+          <div className="flex gap-2 mb-3">
+            <input
+              value={imageLinkInput}
+              onChange={(e) => setImageLinkInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addImageLink())}
+              placeholder="https://... TradingView screenshot URL"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white focus:ring-2 focus:ring-blue-500/50"
+            />
+            <button
+              type="button"
+              onClick={addImageLink}
+              className="px-4 py-2.5 rounded-xl bg-slate-700/80 text-slate-200 hover:bg-slate-600/80 transition"
+            >
+              Add link
+            </button>
+          </div>
           <div
             className="rounded-xl border-2 border-dashed border-slate-700/80 p-6 text-center hover:border-slate-600/80 transition cursor-pointer"
             onDragOver={(e) => {
@@ -486,6 +538,26 @@ export default function NewTradePage() {
                       removePendingImage(i);
                     }}
                     className="absolute top-1 right-1 px-2 py-0.5 rounded-lg bg-red-900/80 text-red-400 text-xs opacity-0 group-hover:opacity-100 transition"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {pendingImageLinks.length > 0 && (
+            <div className="space-y-2 mt-3">
+              {pendingImageLinks.map((url, i) => (
+                <div
+                  key={url}
+                  className="flex items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-800/60 px-3 py-2"
+                >
+                  <img src={url} alt="" className="w-12 h-8 rounded object-cover bg-slate-900" />
+                  <span className="text-xs text-slate-300 truncate flex-1">{url}</span>
+                  <button
+                    type="button"
+                    onClick={() => removePendingImageLink(i)}
+                    className="text-xs px-2 py-1 rounded bg-red-900/70 text-red-300 hover:bg-red-900"
                   >
                     Remove
                   </button>
