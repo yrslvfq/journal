@@ -99,9 +99,9 @@ export async function PATCH(
 
     if (data.tags !== undefined) {
       await prisma.tradeTag.deleteMany({ where: { tradeId: id } });
-      const uniqueTags = [
-        ...new Set(data.tags.map((name) => normalizeTagName(name)).filter(Boolean)),
-      ];
+      const uniqueTags = Array.from(
+        new Set(data.tags.map((name) => normalizeTagName(name)).filter(Boolean))
+      );
       if (uniqueTags.length > 0) {
         await prisma.tradeTag.createMany({
           data: uniqueTags.map((name) => ({ tradeId: id, name })),

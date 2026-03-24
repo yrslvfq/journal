@@ -22,5 +22,5 @@ export function parseWikiTradeIds(text: string): string[] {
     const id = m[1].trim();
     if (id) ids.push(id);
   }
-  return [...new Set(ids)];
+  return Array.from(new Set(ids));
 }

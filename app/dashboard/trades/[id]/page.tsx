@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { SkeletonTradeDetail } from "@/components/ui/skeleton";
+import { TradeNotesWiki } from "@/components/trade-notes-wiki";
+import { TagStatsModal } from "@/components/tag-stats-modal";
 
 type TradeImage = { id: string; url: string; caption: string | null };
 type Trade = {
@@ -21,10 +23,23 @@ type Trade = {
   marketCondition: string | null;
   notes: string | null;
   confirmationNotes: string | null;
+  energyLevel: number | null;
+  sleepHours: number | null;
+  stressLevel: string | null;
+  stateMoodTag: string | null;
   tags: { name: string }[];
   images: TradeImage[];
   setups: { setupType: { id: string; name: string } }[];
   confirmations: { confirmationType: { id: string; name: string } }[];
+};
+
+type SimilarRow = {
+  id: string;
+  symbol: string;
+  date: string;
+  pnl: number;
+  fees: number;
+  tags: string[];
 };
 
 export default function TradeDetailPage() {
@@ -40,6 +55,9 @@ export default function TradeDetailPage() {
   const [imageLinkInput, setImageLinkInput] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [tagModal, setTagModal] = useState<string | null>(null);
+  const [similar, setSimilar] = useState<SimilarRow[] | null>(null);
+  const [similarLoading, setSimilarLoading] = useState(false);
 
   const images = trade?.images ?? [];
 
@@ -96,6 +114,17 @@ export default function TradeDetailPage() {
         setTrade(data);
       })
       .finally(() => setLoading(false));
+  }, [id]);
+
+  const loadSimilar = useCallback(() => {
+    setSimilarLoading(true);
+    fetch(`/api/trades/similar?tradeId=${encodeURIComponent(id)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setSimilar(data.similar || []);
+      })
+      .catch(() => toast.error("Не удалось загрузить похожие сделки"))
+      .finally(() => setSimilarLoading(false));
   }, [id]);
 
   useEffect(() => {
@@ -252,14 +281,19 @@ export default function TradeDetailPage() {
             <span className="px-2 py-1 rounded-lg bg-slate-800/80 text-xs text-slate-400">
               {trade.instrumentType}
             </span>
-            {trade.tags.map((t) => (
-              <span
-                key={t.name}
-                className="px-2 py-1 rounded-lg bg-slate-700/60 text-xs text-slate-300"
-              >
-                {t.name}
-              </span>
-            ))}
+            {trade.tags.map((t) => {
+              const label = t.name.startsWith("#") ? t.name : `#${t.name}`;
+              return (
+                <button
+                  key={t.name}
+                  type="button"
+                  onClick={() => setTagModal(t.name)}
+                  className="px-2 py-1 rounded-lg bg-slate-700/60 text-xs text-slate-300 hover:bg-violet-900/40 hover:text-violet-200 border border-transparent hover:border-violet-500/30 transition"
+                >
+                  {label}
+                </button>
+              );
+            })}
             {trade.setups?.map((s) => (
               <span
                 key={s.setupType.id}
@@ -278,6 +312,41 @@ export default function TradeDetailPage() {
             ))}
           </div>
         </div>
+
+        {(trade.energyLevel != null ||
+          trade.sleepHours != null ||
+          trade.stressLevel ||
+          trade.stateMoodTag) && (
+          <div className="p-6 border-b border-slate-800/80">
+            <h2 className="text-sm font-medium text-slate-400 mb-3">Состояние трейдера</h2>
+            <div className="grid gap-4 sm:grid-cols-2 text-sm">
+              {trade.energyLevel != null && (
+                <div>
+                  <p className="text-xs text-slate-500">Энергия</p>
+                  <p className="text-white font-medium">{trade.energyLevel} / 5</p>
+                </div>
+              )}
+              {trade.sleepHours != null && (
+                <div>
+                  <p className="text-xs text-slate-500">Сон</p>
+                  <p className="text-white font-medium">{trade.sleepHours} ч</p>
+                </div>
+              )}
+              {trade.stressLevel && (
+                <div>
+                  <p className="text-xs text-slate-500">Стресс</p>
+                  <p className="text-white font-medium capitalize">{trade.stressLevel}</p>
+                </div>
+              )}
+              {trade.stateMoodTag && (
+                <div>
+                  <p className="text-xs text-slate-500">Тег</p>
+                  <p className="text-violet-300 font-medium">{trade.stateMoodTag}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="p-6 grid gap-6 sm:grid-cols-2">
           <div>
@@ -327,10 +396,55 @@ export default function TradeDetailPage() {
           </div>
         )}
 
+        {trade.tags.length >= 2 && (
+          <div className="p-6 border-t border-slate-800/80">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              <h2 className="text-sm font-medium text-slate-400">Похожие ситуации</h2>
+              <button
+                type="button"
+                onClick={loadSimilar}
+                disabled={similarLoading}
+                className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 hover:border-blue-500/40 disabled:opacity-50"
+              >
+                {similarLoading ? "Поиск…" : "Показать (≥2 общих тега)"}
+              </button>
+            </div>
+            {similar && similar.length === 0 && (
+              <p className="text-slate-500 text-sm">Нет других сделок с таким пересечением тегов.</p>
+            )}
+            {similar && similar.length > 0 && (
+              <ul className="space-y-2">
+                {similar.map((s) => {
+                  const net = s.pnl - s.fees;
+                  return (
+                    <li key={s.id}>
+                      <Link
+                        href={`/dashboard/trades/${s.id}`}
+                        className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-slate-800/80 bg-slate-800/40 px-3 py-2 hover:border-blue-500/30 transition"
+                      >
+                        <span className="text-white font-medium">
+                          {s.symbol}{" "}
+                          <span className="text-slate-500 font-normal text-xs">
+                            {new Date(s.date).toLocaleDateString()}
+                          </span>
+                        </span>
+                        <span className={net >= 0 ? "text-emerald-400" : "text-red-400"}>
+                          {net >= 0 ? "+" : ""}
+                          {net.toFixed(2)}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
         {trade.notes && (
           <div className="p-6 border-t border-slate-800/80">
             <h2 className="text-sm font-medium text-slate-400 mb-2">Notes</h2>
-            <p className="text-slate-300 whitespace-pre-wrap">{trade.notes}</p>
+            <TradeNotesWiki text={trade.notes} />
           </div>
         )}
 
@@ -470,6 +584,12 @@ export default function TradeDetailPage() {
             </span>
           </div>
         </div>
+
+        <TagStatsModal
+          tagName={tagModal}
+          open={tagModal !== null}
+          onClose={() => setTagModal(null)}
+        />
 
         <div className="p-6 border-t border-slate-800/80">
           <button

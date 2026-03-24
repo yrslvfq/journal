@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     const tagNames = (data.tags ?? [])
       .map((name) => normalizeTagName(name))
       .filter(Boolean);
-    const uniqueTags = [...new Set(tagNames)];
+    const uniqueTags = Array.from(new Set(tagNames));
 
     const trade = await prisma.trade.create({
       data: {

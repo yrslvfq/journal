@@ -4,6 +4,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { TradeKillSwitchGate } from "@/components/trade-kill-switch-gate";
+import {
+  TraderStateFields,
+  defaultTraderState,
+  type TraderStateValues,
+} from "@/components/trader-state-fields";
 
 type SetupType = { id: string; name: string };
 type ConfirmationType = { id: string; name: string };
@@ -36,6 +42,7 @@ export default function NewTradePage() {
     setupIds: [] as string[],
     confirmationIds: [] as string[],
   });
+  const [trader, setTrader] = useState<TraderStateValues>(() => defaultTraderState());
 
   const calculatedPnl =
     form.risk && parseFloat(form.risk) > 0
@@ -143,6 +150,7 @@ export default function NewTradePage() {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
+    const sleepParsed = parseFloat(trader.sleepHours);
     const body = {
       symbol: form.symbol,
       direction: form.direction,
@@ -158,6 +166,10 @@ export default function NewTradePage() {
       setupIds: form.setupIds,
       confirmationIds: form.confirmationIds,
       confirmationNotes: form.confirmationNotes || null,
+      energyLevel: trader.energyLevel ?? 3,
+      sleepHours: Number.isFinite(sleepParsed) ? sleepParsed : null,
+      stressLevel: trader.stressLevel || null,
+      stateMoodTag: trader.stateMoodTag.trim() || null,
     };
     const res = await fetch("/api/trades", {
       method: "POST",
@@ -202,7 +214,8 @@ export default function NewTradePage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <TradeKillSwitchGate tradeDateYmd={form.date}>
+      <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
         <Link
           href="/dashboard/trades"
@@ -438,16 +451,18 @@ export default function NewTradePage() {
           />
         </div>
 
+        <TraderStateFields value={trader} onChange={setTrader} />
+
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Tags (comma-separated)
+            Tags (comma-separated, Obsidian: #FakeOut, #VBP_Rejection)
           </label>
           <input
             name="tags"
             value={form.tags}
             onChange={handleChange}
             className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white focus:ring-2 focus:ring-blue-500/50"
-            placeholder="momentum, breakout, spy"
+            placeholder="#FakeOut, #DoubleDistribution, momentum"
           />
         </div>
 
@@ -455,13 +470,17 @@ export default function NewTradePage() {
           <label className="block text-sm font-medium text-zinc-300 mb-2">
             Notes
           </label>
+          <p className="text-xs text-slate-500 mb-2">
+            Связи со сделками: <code className="text-slate-400">[[clxxxxxxxx]]</code> — ID из URL карточки
+            сделки.
+          </p>
           <textarea
             name="notes"
             value={form.notes}
             onChange={handleChange}
             rows={4}
             className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white resize-none focus:ring-2 focus:ring-blue-500/50"
-            placeholder="Trade notes..."
+            placeholder="Trade notes... Link: [[paste_trade_id_here]]"
           />
         </div>
 
@@ -575,6 +594,7 @@ export default function NewTradePage() {
           {loading ? "Saving..." : "Save trade"}
         </button>
       </form>
-    </div>
+      </div>
+    </TradeKillSwitchGate>
   );
 }

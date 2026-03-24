@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  TraderStateFields,
+  defaultTraderState,
+  type TraderStateValues,
+} from "@/components/trader-state-fields";
 
 type SetupType = { id: string; name: string };
 type ConfirmationType = { id: string; name: string };
@@ -111,6 +116,7 @@ export default function EditTradePage() {
     setupIds: [] as string[],
     confirmationIds: [] as string[],
   });
+  const [trader, setTrader] = useState<TraderStateValues>(() => defaultTraderState());
 
   const calculatedPnl =
     form.risk && parseFloat(form.risk) > 0
@@ -144,6 +150,12 @@ export default function EditTradePage() {
             confirmationIds: t.confirmations?.map((c: { confirmationTypeId: string }) => c.confirmationTypeId) || [],
           }));
           setImages(t.images || []);
+          setTrader({
+            energyLevel: t.energyLevel ?? 3,
+            sleepHours: t.sleepHours != null ? String(t.sleepHours) : "",
+            stressLevel: (t.stressLevel || "") as TraderStateValues["stressLevel"],
+            stateMoodTag: t.stateMoodTag || "",
+          });
         }
       });
   }, [id]);
@@ -186,6 +198,7 @@ export default function EditTradePage() {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
+    const sleepParsed = parseFloat(trader.sleepHours);
     const body = {
       symbol: form.symbol,
       direction: form.direction,
@@ -201,6 +214,10 @@ export default function EditTradePage() {
       setupIds: form.setupIds,
       confirmationIds: form.confirmationIds,
       confirmationNotes: form.confirmationNotes || null,
+      energyLevel: trader.energyLevel ?? 3,
+      sleepHours: Number.isFinite(sleepParsed) ? sleepParsed : null,
+      stressLevel: trader.stressLevel || null,
+      stateMoodTag: trader.stateMoodTag.trim() || null,
     };
     const res = await fetch(`/api/trades/${id}`, {
       method: "PATCH",
@@ -490,9 +507,11 @@ export default function EditTradePage() {
           />
         </div>
 
+        <TraderStateFields value={trader} onChange={setTrader} />
+
         <div>
           <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Tags (comma-separated)
+            Tags (comma-separated, Obsidian: #FakeOut)
           </label>
           <input
             name="tags"
@@ -506,6 +525,9 @@ export default function EditTradePage() {
           <label className="block text-sm font-medium text-zinc-300 mb-2">
             Notes
           </label>
+          <p className="text-xs text-slate-500 mb-2">
+            Связи: <code className="text-slate-400">[[trade_id]]</code>
+          </p>
           <textarea
             name="notes"
             value={form.notes}

@@ -8,6 +8,7 @@ import { useLanguage } from "@/components/language-provider";
 
 const nav = [
   { href: "/dashboard", label: { en: "Dashboard", ru: "Дашборд" } },
+  { href: "/dashboard/prop-guard", label: { en: "Prop Guard", ru: "Prop Guard" } },
   { href: "/dashboard/trades", label: { en: "Trades", ru: "Сделки" } },
   { href: "/dashboard/trades/gallery", label: { en: "Trades Gallery", ru: "Галерея сделок" } },
   { href: "/dashboard/research", label: { en: "Research", ru: "Ресерч" } },
