@@ -72,6 +72,11 @@ function LoginForm() {
             required
             className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition"
           />
+          <div className="mt-2 text-right">
+            <Link href="/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 transition">
+              Forgot password?
+            </Link>
+          </div>
         </div>
         <button
           type="submit"

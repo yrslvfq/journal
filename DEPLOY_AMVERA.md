@@ -22,6 +22,9 @@
 | `UPLOADS_DIR` | `/data/uploads` | Папка для скриншотов и изображений (должна быть в /data) |
 | `NEXTAUTH_SECRET` | случайная строка | Сгенерируйте: `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | `https://ваш-проект.amvera.ru` | URL приложения после деплоя |
+| `APP_URL` | `https://ваш-проект.amvera.ru` | Базовый URL для ссылок в email |
+| `RESEND_API_KEY` | `re_...` | API ключ Resend для отправки email |
+| `MAIL_FROM` | `no-reply@ваш-домен` | Отправитель писем (должен быть верифицирован в Resend) |
 
 ## 4. Первый деплой
 
