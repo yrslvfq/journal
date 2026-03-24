@@ -5,7 +5,7 @@ meta:
     version: 20
 
 build:
-  additionalCommands: npx prisma generate && npm run build
+  additionalCommands: npm ci --registry=https://registry.npmjs.org/ --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 && npx prisma generate && npm run build
 
 run:
   command: npx prisma db push && npm run start
