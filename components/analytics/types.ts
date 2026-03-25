@@ -40,12 +40,36 @@ export type TraderBehaviorDto = {
   };
 };
 
+export type MonteCarloBootstrapDto = {
+  finalEquityP5: number;
+  finalEquityP50: number;
+  finalEquityP95: number;
+  maxDdP5: number;
+  maxDdP50: number;
+  maxDdP95: number;
+  meanFinalEquity: number;
+  probFinalNegativePct: number;
+};
+
 export type MonteCarloDto = {
   tradeCount: number;
   iterations: number;
   historicalMaxDrawdown: number;
   maxDrawdownProbabilityPct: number;
   medianSimulatedMaxDrawdown: number;
+  maxDdPercentiles: { p5: number; p50: number; p95: number; simMax: number };
+  historicalMaxLossStreak: number;
+  lossStreakGeHistoricalProbPct: number;
+  simulatedLossStreakMedian: number;
+  simulatedLossStreakP95: number;
+  historicalMaxUnderwater: number;
+  underwaterGeHistoricalProbPct: number;
+  simulatedUnderwaterMedian: number;
+  simulatedUnderwaterP95: number;
+  historicalAvgR: number | null;
+  simulatedAvgRMedian: number | null;
+  bootstrap: MonteCarloBootstrapDto | null;
+  ddHistogram: { binLabel: string; count: number }[];
   chartRows: { step: number; [key: string]: number | string }[];
   pathKeys: string[];
 };

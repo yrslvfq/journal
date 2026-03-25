@@ -11,6 +11,17 @@ const MSK_WEEKDAY_TO_INDEX: Record<string, number> = {
   Fri: 5,
 };
 
+export type MonteCarloBootstrapDto = {
+  finalEquityP5: number;
+  finalEquityP50: number;
+  finalEquityP95: number;
+  maxDdP5: number;
+  maxDdP50: number;
+  maxDdP95: number;
+  meanFinalEquity: number;
+  probFinalNegativePct: number;
+};
+
 export type MonteCarloDto = {
   tradeCount: number;
   iterations: number;
@@ -18,6 +29,23 @@ export type MonteCarloDto = {
   /** Share of simulations whose max drawdown is at least the historical (chronological) max DD. */
   maxDrawdownProbabilityPct: number;
   medianSimulatedMaxDrawdown: number;
+  /** Simulated max DD distribution (permutation). */
+  maxDdPercentiles: { p5: number; p50: number; p95: number; simMax: number };
+  /** Max consecutive losing trades (net &lt; 0). */
+  historicalMaxLossStreak: number;
+  lossStreakGeHistoricalProbPct: number;
+  simulatedLossStreakMedian: number;
+  simulatedLossStreakP95: number;
+  /** Longest run of steps strictly below running peak equity. */
+  historicalMaxUnderwater: number;
+  underwaterGeHistoricalProbPct: number;
+  simulatedUnderwaterMedian: number;
+  simulatedUnderwaterP95: number;
+  /** Mean of per-trade R-multiple (net/risk) on last shuffle sample path — informational. */
+  historicalAvgR: number | null;
+  simulatedAvgRMedian: number | null;
+  bootstrap: MonteCarloBootstrapDto | null;
+  ddHistogram: { binLabel: string; count: number }[];
   chartRows: { step: number; [key: string]: number | string }[];
   pathKeys: string[];
 };
@@ -75,23 +103,173 @@ function medianSorted(sorted: number[]): number {
   return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
-export function computeMonteCarlo(netPnlsChronological: number[], rnd: () => number = Math.random): MonteCarloDto {
+function percentileSorted(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo]!;
+  return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (idx - lo);
+}
+
+export function maxConsecutiveLosses(pnls: number[]): number {
+  let cur = 0;
+  let best = 0;
+  for (const x of pnls) {
+    if (x < 0) {
+      cur += 1;
+      best = Math.max(best, cur);
+    } else {
+      cur = 0;
+    }
+  }
+  return best;
+}
+
+export function maxUnderwaterLength(pnls: number[]): number {
+  let equity = 0;
+  let peak = 0;
+  let span = 0;
+  let maxSpan = 0;
+  for (const x of pnls) {
+    equity += x;
+    if (equity >= peak) {
+      peak = equity;
+      span = 0;
+    } else {
+      span += 1;
+      maxSpan = Math.max(maxSpan, span);
+    }
+  }
+  return maxSpan;
+}
+
+function shuffleTwoInPlace(a: number[], b: number[] | null, rnd: () => number) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+    if (b) [b[i], b[j]] = [b[j], b[i]];
+  }
+}
+
+function avgRMultiple(pnls: number[], risks: number[] | null): number | null {
+  if (!risks || risks.length !== pnls.length) return null;
+  let sum = 0;
+  let k = 0;
+  for (let i = 0; i < pnls.length; i++) {
+    const r = risks[i]!;
+    if (r > 0) {
+      sum += pnls[i]! / r;
+      k += 1;
+    }
+  }
+  return k > 0 ? sum / k : null;
+}
+
+function buildDdHistogram(maxDds: number[], bins: number): { binLabel: string; count: number }[] {
+  if (maxDds.length === 0) return [];
+  const sorted = [...maxDds].sort((a, b) => a - b);
+  const minV = sorted[0]!;
+  const maxV = sorted[sorted.length - 1]!;
+  if (minV === maxV) {
+    return [{ binLabel: minV.toFixed(0), count: maxDds.length }];
+  }
+  const step = (maxV - minV) / bins;
+  const counts = new Array(bins).fill(0);
+  for (const d of maxDds) {
+    let i = Math.floor((d - minV) / step);
+    if (i >= bins) i = bins - 1;
+    if (i < 0) i = 0;
+    counts[i] += 1;
+  }
+  return counts.map((count, i) => {
+    const lo = minV + i * step;
+    const hi = minV + (i + 1) * step;
+    return { binLabel: `${lo.toFixed(0)}–${hi.toFixed(0)}`, count };
+  });
+}
+
+function computeBootstrapBlock(
+  netPnls: number[],
+  iterations: number,
+  rnd: () => number
+): MonteCarloBootstrapDto {
+  const n = netPnls.length;
+  const finals: number[] = [];
+  const maxDdsB: number[] = [];
+  const path: number[] = new Array(n);
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i = 0; i < n; i++) {
+      path[i] = netPnls[Math.floor(rnd() * n)]!;
+    }
+    finals.push(path.reduce((s, x) => s + x, 0));
+    maxDdsB.push(maxDrawdownFromPnls(path));
+  }
+  const sortF = [...finals].sort((a, b) => a - b);
+  const sortD = [...maxDdsB].sort((a, b) => a - b);
+  const probNeg = finals.filter((x) => x < 0).length / iterations;
+  return {
+    finalEquityP5: percentileSorted(sortF, 5),
+    finalEquityP50: percentileSorted(sortF, 50),
+    finalEquityP95: percentileSorted(sortF, 95),
+    maxDdP5: percentileSorted(sortD, 5),
+    maxDdP50: percentileSorted(sortD, 50),
+    maxDdP95: percentileSorted(sortD, 95),
+    meanFinalEquity: finals.reduce((a, b) => a + b, 0) / finals.length,
+    probFinalNegativePct: probNeg * 100,
+  };
+}
+
+export function computeMonteCarlo(
+  netPnlsChronological: number[],
+  risksChronological: number[] | null,
+  rnd: () => number = Math.random
+): MonteCarloDto {
   const n = netPnlsChronological.length;
   const pathKeys = Array.from({ length: CHART_PATHS }, (_, i) => `p${i}`);
+
+  const emptyExtras = () => ({
+    maxDdPercentiles: { p5: 0, p50: 0, p95: 0, simMax: 0 },
+    historicalMaxLossStreak: 0,
+    lossStreakGeHistoricalProbPct: 0,
+    simulatedLossStreakMedian: 0,
+    simulatedLossStreakP95: 0,
+    historicalMaxUnderwater: 0,
+    underwaterGeHistoricalProbPct: 0,
+    simulatedUnderwaterMedian: 0,
+    simulatedUnderwaterP95: 0,
+    historicalAvgR: null as number | null,
+    simulatedAvgRMedian: null as number | null,
+    ddHistogram: [] as { binLabel: string; count: number }[],
+    bootstrap: null as MonteCarloBootstrapDto | null,
+  });
+
   if (n < 2) {
+    const histDd = n === 1 ? maxDrawdownFromPnls(netPnlsChronological) : 0;
     return {
       tradeCount: n,
       iterations: MONTE_CARLO_ITERATIONS,
-      historicalMaxDrawdown: n === 1 ? 0 : maxDrawdownFromPnls(netPnlsChronological),
+      historicalMaxDrawdown: histDd,
       maxDrawdownProbabilityPct: 0,
       medianSimulatedMaxDrawdown: 0,
+      ...emptyExtras(),
       chartRows: [],
       pathKeys,
     };
   }
 
   const historicalMaxDrawdown = maxDrawdownFromPnls(netPnlsChronological);
+  const historicalMaxLossStreak = maxConsecutiveLosses(netPnlsChronological);
+  const historicalMaxUnderwater = maxUnderwaterLength(netPnlsChronological);
+  const historicalAvgR = avgRMultiple(netPnlsChronological, risksChronological);
+
+  const risks =
+    risksChronological && risksChronological.length === n ? [...risksChronological] : null;
+
   const maxDds: number[] = [];
+  const lossStreaks: number[] = [];
+  const underwaters: number[] = [];
+  const avgRs: number[] = [];
   const chartPathEquities: number[][] = [];
   const chartIterIndices = new Set<number>();
   while (chartIterIndices.size < CHART_PATHS) {
@@ -99,12 +277,20 @@ export function computeMonteCarlo(netPnlsChronological: number[], rnd: () => num
   }
 
   const working = [...netPnlsChronological];
+  const riskWorking = risks ? [...risks] : null;
 
   for (let iter = 0; iter < MONTE_CARLO_ITERATIONS; iter++) {
     for (let i = 0; i < n; i++) working[i] = netPnlsChronological[i]!;
-    shuffleInPlace(working, rnd);
+    if (riskWorking) {
+      for (let i = 0; i < n; i++) riskWorking[i] = risksChronological![i]!;
+    }
+    shuffleTwoInPlace(working, riskWorking, rnd);
     const dd = maxDrawdownFromPnls(working);
     maxDds.push(dd);
+    lossStreaks.push(maxConsecutiveLosses(working));
+    underwaters.push(maxUnderwaterLength(working));
+    const ar = avgRMultiple(working, riskWorking);
+    if (ar != null) avgRs.push(ar);
 
     if (chartIterIndices.has(iter)) {
       let eq = 0;
@@ -112,10 +298,35 @@ export function computeMonteCarlo(netPnlsChronological: number[], rnd: () => num
     }
   }
 
-  const exceedCount = maxDds.filter((d) => d >= historicalMaxDrawdown - 1e-9).length;
-  const maxDrawdownProbabilityPct = (exceedCount / MONTE_CARLO_ITERATIONS) * 100;
-  const sorted = [...maxDds].sort((a, b) => a - b);
-  const medianSimulatedMaxDrawdown = medianSorted(sorted);
+  const exceedDd = maxDds.filter((d) => d >= historicalMaxDrawdown - 1e-9).length;
+  const maxDrawdownProbabilityPct = (exceedDd / MONTE_CARLO_ITERATIONS) * 100;
+  const sortedDd = [...maxDds].sort((a, b) => a - b);
+  const medianSimulatedMaxDrawdown = medianSorted(sortedDd);
+
+  const maxDdPercentiles = {
+    p5: percentileSorted(sortedDd, 5),
+    p50: percentileSorted(sortedDd, 50),
+    p95: percentileSorted(sortedDd, 95),
+    simMax: sortedDd[sortedDd.length - 1]!,
+  };
+
+  const streakGe = lossStreaks.filter((s) => s >= historicalMaxLossStreak).length;
+  const lossStreakGeHistoricalProbPct = (streakGe / MONTE_CARLO_ITERATIONS) * 100;
+  const sortedStreak = [...lossStreaks].sort((a, b) => a - b);
+  const simulatedLossStreakMedian = medianSorted(sortedStreak);
+  const simulatedLossStreakP95 = percentileSorted(sortedStreak, 95);
+
+  const uwGe = underwaters.filter((u) => u >= historicalMaxUnderwater).length;
+  const underwaterGeHistoricalProbPct = (uwGe / MONTE_CARLO_ITERATIONS) * 100;
+  const sortedUw = [...underwaters].sort((a, b) => a - b);
+  const simulatedUnderwaterMedian = medianSorted(sortedUw);
+  const simulatedUnderwaterP95 = percentileSorted(sortedUw, 95);
+
+  const sortedAvgR = [...avgRs].sort((a, b) => a - b);
+  const simulatedAvgRMedian = avgRs.length > 0 ? medianSorted(sortedAvgR) : null;
+
+  const ddHistogram = buildDdHistogram(maxDds, 12);
+  const bootstrap = computeBootstrapBlock(netPnlsChronological, MONTE_CARLO_ITERATIONS, rnd);
 
   const chartRows: { step: number; [key: string]: number | string }[] = [];
   for (let step = 0; step <= n; step++) {
@@ -132,6 +343,19 @@ export function computeMonteCarlo(netPnlsChronological: number[], rnd: () => num
     historicalMaxDrawdown,
     maxDrawdownProbabilityPct,
     medianSimulatedMaxDrawdown,
+    maxDdPercentiles,
+    historicalMaxLossStreak,
+    lossStreakGeHistoricalProbPct,
+    simulatedLossStreakMedian,
+    simulatedLossStreakP95,
+    historicalMaxUnderwater,
+    underwaterGeHistoricalProbPct,
+    simulatedUnderwaterMedian,
+    simulatedUnderwaterP95,
+    historicalAvgR,
+    simulatedAvgRMedian,
+    bootstrap,
+    ddHistogram,
     chartRows,
     pathKeys,
   };
@@ -153,14 +377,6 @@ export function tradeMskWeekdayHour(date: Date): { weekday: number; hour: number
   if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
   return { weekday: day, hour };
 }
-
-const WD_LABELS: Record<number, string> = {
-  1: "Пн",
-  2: "Вт",
-  3: "Ср",
-  4: "Чт",
-  5: "Пт",
-};
 
 export function buildActivityHeatmap(
   trades: { date: Date; pnl: number; fees: number }[]
@@ -213,7 +429,7 @@ export function buildActivityHeatmap(
 
       cells.push({
         weekday,
-        weekdayLabel: WD_LABELS[weekday]!,
+        weekdayLabel: "",
         hour,
         trades: tradesCount,
         wins: acc.wins,

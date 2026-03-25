@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { sessionPersonaIcon } from "@/components/analytics/behavior-tab";
 import { disciplineScoreFromChecklist } from "@/lib/analytics-advanced";
 import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 
 function localIsoDate(d = new Date()) {
   const y = d.getFullYear();
@@ -22,6 +23,8 @@ type RecapRow = {
   noStopMoving: boolean;
   disciplineScore: number;
   lessonOfDay: string;
+  sessionStatus: string | null;
+  sessionEfficiency: number | null;
 };
 
 type SessionMetrics = {
@@ -34,21 +37,25 @@ type SessionMetrics = {
   efficiencyScore: number;
 };
 
-function personaLabel(persona: string, ru: boolean) {
+function personaLabel(
+  persona: string,
+  t: ReturnType<typeof dashboardT>["dailyRecap"]
+) {
   switch (persona) {
     case "sniper":
-      return ru ? "Снайпер" : "Sniper";
+      return t.personaSniper;
     case "machine_gunner":
-      return ru ? "Пулемётчик" : "Machine gunner";
+      return t.personaMachine;
     case "brokers_best_friend":
-      return ru ? "Лучший друг брокера" : "Broker's best friend";
+      return t.personaBroker;
     default:
-      return ru ? "Сбалансированно" : "Balanced";
+      return t.personaBalanced;
   }
 }
 
 export default function DailyRecapsPage() {
   const language = useAppLanguage();
+  const t = dashboardT(language).dailyRecap;
   const [selectedDate, setSelectedDate] = useState(localIsoDate);
   const [keptLossLimit, setKeptLossLimit] = useState(false);
   const [setupsOnly, setSetupsOnly] = useState(false);
@@ -56,6 +63,10 @@ export default function DailyRecapsPage() {
   const [lessonOfDay, setLessonOfDay] = useState("");
   const [dayPnl, setDayPnl] = useState<number | null>(null);
   const [tradesCount, setTradesCount] = useState(0);
+  const [dayWins, setDayWins] = useState(0);
+  const [dayLosses, setDayLosses] = useState(0);
+  const [dayBreakeven, setDayBreakeven] = useState(0);
+  const [totalFees, setTotalFees] = useState(0);
   const [list, setList] = useState<RecapRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,32 +77,43 @@ export default function DailyRecapsPage() {
     [keptLossLimit, setupsOnly, noStopMoving]
   );
 
-  const loadDay = useCallback(async (iso: string) => {
-    setLoading(true);
-    try {
-      const r = await fetch(`/api/daily-recaps/${iso}`);
-      if (!r.ok) throw new Error("Failed to load");
-      const data = await r.json();
-      setDayPnl(data.dayPnl ?? 0);
-      setTradesCount(data.tradesCount ?? 0);
-      setSessionMetrics(data.sessionMetrics ?? null);
-      if (data.recap) {
-        setKeptLossLimit(!!data.recap.keptLossLimit);
-        setSetupsOnly(!!data.recap.setupsOnly);
-        setNoStopMoving(!!data.recap.noStopMoving);
-        setLessonOfDay(data.recap.lessonOfDay ?? "");
-      } else {
-        setKeptLossLimit(false);
-        setSetupsOnly(false);
-        setNoStopMoving(false);
-        setLessonOfDay("");
+  const applyDayPayload = useCallback((data: Record<string, unknown>) => {
+    setDayPnl((data.dayPnl as number) ?? 0);
+    setTradesCount((data.tradesCount as number) ?? 0);
+    setDayWins((data.dayWins as number) ?? 0);
+    setDayLosses((data.dayLosses as number) ?? 0);
+    setDayBreakeven((data.dayBreakeven as number) ?? 0);
+    setTotalFees((data.totalFees as number) ?? 0);
+    setSessionMetrics((data.sessionMetrics as SessionMetrics) ?? null);
+  }, []);
+
+  const loadDay = useCallback(
+    async (iso: string) => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/daily-recaps/${iso}`);
+        if (!r.ok) throw new Error("Failed to load");
+        const data = await r.json();
+        applyDayPayload(data);
+        if (data.recap) {
+          setKeptLossLimit(!!data.recap.keptLossLimit);
+          setSetupsOnly(!!data.recap.setupsOnly);
+          setNoStopMoving(!!data.recap.noStopMoving);
+          setLessonOfDay(data.recap.lessonOfDay ?? "");
+        } else {
+          setKeptLossLimit(false);
+          setSetupsOnly(false);
+          setNoStopMoving(false);
+          setLessonOfDay("");
+        }
+      } catch {
+        toast.error(t.loadErr);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      toast.error(language === "ru" ? "Не удалось загрузить день" : "Failed to load day");
-    } finally {
-      setLoading(false);
-    }
-  }, [language]);
+    },
+    [applyDayPayload, t.loadErr]
+  );
 
   const loadList = useCallback(async () => {
     try {
@@ -107,6 +129,8 @@ export default function DailyRecapsPage() {
           noStopMoving: boolean;
           disciplineScore: number;
           lessonOfDay: string;
+          sessionStatus: string | null;
+          sessionEfficiency: number | null;
         }) => ({
           ...x,
           date: typeof x.date === "string" ? x.date.slice(0, 10) : x.date,
@@ -143,54 +167,15 @@ export default function DailyRecapsPage() {
       });
       if (!r.ok) throw new Error("save");
       const data = await r.json();
-      setDayPnl(data.dayPnl);
-      setTradesCount(data.tradesCount);
-      setSessionMetrics(data.sessionMetrics ?? null);
-      toast.success(language === "ru" ? "Сохранено" : "Saved");
+      applyDayPayload(data);
+      toast.success(t.saveOk);
       loadList();
     } catch {
-      toast.error(language === "ru" ? "Ошибка сохранения" : "Save failed");
+      toast.error(t.saveErr);
     } finally {
       setSaving(false);
     }
   }
-
-  const t =
-    language === "ru"
-      ? {
-          title: "Дневные итоги",
-          subtitle:
-            "Чек-лист, дисциплина и урок дня. P&L подтягивается из сделок за выбранную дату (UTC-календарь, как в аналитике).",
-          date: "Дата",
-          pnlLabel: "P&L за день",
-          trades: "Сделок",
-          checklist1: "Соблюдал лимит потерь?",
-          checklist2: "Заходил только по сетапам?",
-          checklist3: "Не двигал стопы?",
-          score: "Оценка дисциплины",
-          scoreHint: "1–100, автоматически от чек-листа (три пункта с равным весом).",
-          lesson: "Урок дня",
-          save: "Сохранить",
-          recent: "Недавние рекапы",
-          listEmpty: "Пока нет сохранённых рекапов",
-        }
-      : {
-          title: "Daily recaps",
-          subtitle:
-            "Checklist, discipline score, and lesson of the day. P&L is summed from trades on the selected date (UTC calendar day, same as analytics).",
-          date: "Date",
-          pnlLabel: "Day P&L",
-          trades: "Trades",
-          checklist1: "Stayed within loss limits?",
-          checklist2: "Traded only valid setups?",
-          checklist3: "Did not move stops?",
-          score: "Discipline score",
-          scoreHint: "1–100 from the checklist (three equal weights).",
-          lesson: "Lesson of the day",
-          save: "Save",
-          recent: "Recent recaps",
-          listEmpty: "No saved recaps yet",
-        };
 
   return (
     <div className="space-y-8">
@@ -226,11 +211,41 @@ export default function DailyRecapsPage() {
             </div>
           </div>
 
+          {!loading && tradesCount > 0 && (
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{t.dayStatsTitle}</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-slate-500">{t.wins}</p>
+                  <p className="font-semibold text-emerald-400 tabular-nums">{dayWins}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">{t.losses}</p>
+                  <p className="font-semibold text-red-400 tabular-nums">{dayLosses}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">{t.breakeven}</p>
+                  <p className="font-semibold text-slate-300 tabular-nums">{dayBreakeven}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">{t.fees}</p>
+                  <p className="font-semibold text-white tabular-nums">{totalFees.toFixed(2)}</p>
+                </div>
+              </div>
+              <Link
+                href={`/dashboard/trades?dateFrom=${selectedDate}&dateTo=${selectedDate}`}
+                className="mt-3 inline-block text-xs text-blue-400 hover:text-blue-300"
+              >
+                {t.linkTrades}
+              </Link>
+            </div>
+          )}
+
           {!loading && sessionMetrics && sessionMetrics.tradesCount > 0 && (
             <div className="rounded-xl border border-cyan-500/20 bg-slate-950/50 p-4 font-mono">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-                  {language === "ru" ? "КПД сессии" : "Session efficiency"}
+                  {t.sessionEfficiency}
                 </span>
                 {(() => {
                   const Icon = sessionPersonaIcon(sessionMetrics.persona);
@@ -238,10 +253,10 @@ export default function DailyRecapsPage() {
                 })()}
               </div>
               <p className="text-sm font-semibold text-white">
-                {personaLabel(sessionMetrics.persona, language === "ru")}
+                {personaLabel(sessionMetrics.persona, t)}
               </p>
               <p className="mt-2 text-[11px] text-slate-500">
-                {language === "ru" ? "Чистая / сумма комиссий" : "Net / total fees"}:{" "}
+                {t.netPerFees}:{" "}
                 <span className="tabular-nums text-slate-300">
                   {sessionMetrics.efficiencyPerFeeUsd != null
                     ? sessionMetrics.efficiencyPerFeeUsd.toFixed(2)
@@ -249,7 +264,7 @@ export default function DailyRecapsPage() {
                 </span>
               </p>
               <p className="mt-0.5 text-[10px] text-slate-600">
-                {language === "ru" ? "Чистая / (комиссии × сделки)" : "Net / (fees × trades)"}:{" "}
+                {t.netPerFeesFormula}:{" "}
                 <span className="tabular-nums">
                   {sessionMetrics.efficiencyUserFormula != null
                     ? sessionMetrics.efficiencyUserFormula.toFixed(4)
@@ -258,7 +273,7 @@ export default function DailyRecapsPage() {
               </p>
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-[10px] text-slate-500">
-                  <span>{language === "ru" ? "Шкала" : "Score bar"}</span>
+                  <span>{t.scoreBar}</span>
                   <span className="tabular-nums">{Math.round(sessionMetrics.efficiencyScore)}</span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
@@ -325,35 +340,55 @@ export default function DailyRecapsPage() {
             disabled={saving || loading}
             className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow shadow-blue-950/40 transition hover:bg-blue-500 disabled:opacity-50"
           >
-            {saving ? "…" : t.save}
+            {saving ? t.saving : t.save}
           </button>
         </form>
 
         <aside className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4">
           <h2 className="text-sm font-medium text-slate-300">{t.recent}</h2>
           <ul className="mt-3 max-h-[480px] space-y-2 overflow-y-auto text-sm">
-            {list.map((row) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(row.date)}
-                  className={`w-full rounded-lg px-3 py-2 text-left transition ${
-                    row.date === selectedDate ? "bg-blue-600/20 text-blue-200" : "text-slate-400 hover:bg-slate-800/60"
-                  }`}
-                >
-                  <span className="font-medium text-white">{row.date}</span>
-                  <span className="ml-2 text-xs text-slate-500">{row.disciplineScore}</span>
-                </button>
-              </li>
-            ))}
+            {list.map((row) => {
+              const personaKey = row.sessionStatus ?? "balanced";
+              const ListIcon = sessionPersonaIcon(personaKey);
+              return (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(row.date)}
+                    className={`w-full rounded-lg px-3 py-2 text-left transition ${
+                      row.date === selectedDate ? "bg-blue-600/20 text-blue-200" : "text-slate-400 hover:bg-slate-800/60"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <ListIcon className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400/90" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="font-medium text-white">{row.date}</span>
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                            {t.listDiscipline}: {row.disciplineScore}
+                          </span>
+                        </div>
+                        {row.sessionEfficiency != null && (
+                          <p className="mt-0.5 truncate text-[10px] text-slate-500 tabular-nums">
+                            {personaLabel(personaKey, t)} · {row.sessionEfficiency.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
             {list.length === 0 && <li className="text-slate-600 text-xs">{t.listEmpty}</li>}
           </ul>
-          <Link
-            href="/dashboard/analytics?tab=advanced"
-            className="mt-4 inline-block text-xs text-blue-400 hover:text-blue-300"
-          >
-            {language === "ru" ? "Аналитика → Advanced" : "Analytics → Advanced"}
-          </Link>
+          <div className="mt-4 flex flex-col gap-2 text-xs">
+            <Link href="/dashboard/analytics?tab=advanced" className="text-blue-400 hover:text-blue-300">
+              {t.analyticsAdvanced}
+            </Link>
+            <Link href="/dashboard/analytics?tab=behavior" className="text-blue-400 hover:text-blue-300">
+              {t.analyticsBehavior}
+            </Link>
+          </div>
         </aside>
       </div>
     </div>

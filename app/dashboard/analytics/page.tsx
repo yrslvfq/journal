@@ -1,26 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnalyticsHubTabs } from "@/components/analytics/hub-tabs";
 import { AnalyticsPeriodFilters } from "@/components/analytics/period-filters";
 import { AnalyticsTabContent } from "@/components/analytics/tab-content";
 import { SkeletonCard, SkeletonChart } from "@/components/ui/skeleton";
 import { AnalyticsDto, AnalyticsPeriod, AnalyticsTabId } from "@/components/analytics/types";
-
-const HUB_TABS: { id: AnalyticsTabId; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "funnel", label: "Funnel" },
-  { id: "risk", label: "Risk" },
-  { id: "segments", label: "Segments" },
-  { id: "time-patterns", label: "Time Patterns" },
-  { id: "quality", label: "Quality" },
-  { id: "psych", label: "Psych" },
-  { id: "advanced", label: "Advanced" },
-  { id: "behavior", label: "Behavior" },
-];
+import { useAppLanguage } from "@/lib/app-language";
+import { dashboardT } from "@/lib/i18n/dashboard";
 
 export default function AnalyticsPage() {
+  const lang = useAppLanguage();
+  const hub = dashboardT(lang).analyticsHub;
+  const ap = dashboardT(lang).analyticsPage;
+  const HUB_TABS: { id: AnalyticsTabId; label: string }[] = useMemo(
+    () => [
+      { id: "overview", label: hub.overview },
+      { id: "funnel", label: hub.funnel },
+      { id: "risk", label: hub.risk },
+      { id: "segments", label: hub.segments },
+      { id: "time-patterns", label: hub.timePatterns },
+      { id: "quality", label: hub.quality },
+      { id: "psych", label: hub.psych },
+      { id: "advanced", label: hub.advanced },
+      { id: "behavior", label: hub.behavior },
+    ],
+    [hub]
+  );
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const [data, setData] = useState<AnalyticsDto | null>(null);
@@ -66,7 +74,7 @@ export default function AnalyticsPage() {
   if (loading && canFetch) {
     return (
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-white">Analytics Hub</h1>
+        <h1 className="text-3xl font-bold text-white">{ap.title}</h1>
         <AnalyticsPeriodFilters
           period={period}
           dateFrom={dateFrom}
@@ -98,7 +106,7 @@ export default function AnalyticsPage() {
   if (period === "custom" && !canFetch) {
     return (
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-white">Analytics Hub</h1>
+        <h1 className="text-3xl font-bold text-white">{ap.title}</h1>
         <AnalyticsPeriodFilters
           period={period}
           dateFrom={dateFrom}
@@ -111,7 +119,7 @@ export default function AnalyticsPage() {
         />
         <AnalyticsHubTabs tabs={HUB_TABS} activeTab={activeTab} onChange={handleTabChange} />
         <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-12 text-center text-slate-500">
-          Select date range to view analytics
+          {ap.emptyCustom}
         </div>
       </div>
     );

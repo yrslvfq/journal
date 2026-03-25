@@ -438,7 +438,10 @@ export async function GET(req: Request) {
   const tradesPerDay = daysWithTrades > 0 ? trades.length / daysWithTrades : null;
 
   const netPnlsChronological = trades.map((t) => t.pnl - t.fees);
-  const monteCarlo = computeMonteCarlo(netPnlsChronological);
+  const monteCarlo = computeMonteCarlo(
+    netPnlsChronological,
+    trades.map((t) => t.risk)
+  );
   const activityHeatmap = buildActivityHeatmap(
     trades.map((t) => ({ date: t.date, pnl: t.pnl, fees: t.fees }))
   );

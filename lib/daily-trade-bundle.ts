@@ -8,9 +8,23 @@ export async function getUserDayTradingBundle(userId: string, dayStart: Date) {
     select: { pnl: true, fees: true },
   });
   const dayPnl = trades.reduce((s, t) => s + t.pnl - t.fees, 0);
+  let dayWins = 0;
+  let dayLosses = 0;
+  let dayBreakeven = 0;
+  for (const t of trades) {
+    const net = t.pnl - t.fees;
+    if (net > 0) dayWins++;
+    else if (net < 0) dayLosses++;
+    else dayBreakeven++;
+  }
+  const sessionMetrics = computeDaySessionMetrics(trades);
   return {
     dayPnl,
     tradesCount: trades.length,
-    sessionMetrics: computeDaySessionMetrics(trades),
+    dayWins,
+    dayLosses,
+    dayBreakeven,
+    totalFees: sessionMetrics.totalFees,
+    sessionMetrics,
   };
 }

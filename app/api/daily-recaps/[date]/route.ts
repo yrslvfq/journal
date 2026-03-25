@@ -30,6 +30,10 @@ export async function GET(_req: Request, { params }: { params: { date: string } 
     recap,
     dayPnl: bundle.dayPnl,
     tradesCount: bundle.tradesCount,
+    dayWins: bundle.dayWins,
+    dayLosses: bundle.dayLosses,
+    dayBreakeven: bundle.dayBreakeven,
+    totalFees: bundle.totalFees,
     sessionMetrics: bundle.sessionMetrics,
   });
 }

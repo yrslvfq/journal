@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { SkeletonTable } from "@/components/ui/skeleton";
 
@@ -31,8 +31,9 @@ type Pagination = {
   totalPages: number;
 };
 
-export default function TradesPage() {
+function TradesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -88,6 +89,13 @@ export default function TradesPage() {
   useEffect(() => {
     fetchTags();
   }, []);
+
+  useEffect(() => {
+    const df = searchParams.get("dateFrom")?.trim();
+    const dt = searchParams.get("dateTo")?.trim();
+    if (df) setDateFrom(df);
+    if (dt) setDateTo(dt);
+  }, [searchParams]);
 
   useEffect(() => {
     fetch("/api/setup-types").then((r) => r.json()).then(setSetupTypes);
@@ -435,5 +443,13 @@ export default function TradesPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function TradesPage() {
+  return (
+    <Suspense fallback={<SkeletonTable rows={10} />}>
+      <TradesPageContent />
+    </Suspense>
   );
 }

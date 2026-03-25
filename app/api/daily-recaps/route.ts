@@ -89,6 +89,10 @@ export async function POST(req: Request) {
     recap,
     dayPnl: bundle.dayPnl,
     tradesCount: bundle.tradesCount,
+    dayWins: bundle.dayWins,
+    dayLosses: bundle.dayLosses,
+    dayBreakeven: bundle.dayBreakeven,
+    totalFees: bundle.totalFees,
     sessionMetrics: bundle.sessionMetrics,
   });
 }
