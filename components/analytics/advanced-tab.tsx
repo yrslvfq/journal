@@ -239,7 +239,9 @@ export function AdvancedAnalyticsTab({ monteCarlo, activityHeatmap, kelly }: Pro
               </div>
             )}
 
-            <div className="mt-5 h-72">
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-medium text-slate-400">{t.mcPermChartTitle}</p>
+              <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monteCarlo.chartRows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -267,6 +269,7 @@ export function AdvancedAnalyticsTab({ monteCarlo, activityHeatmap, kelly }: Pro
                   ))}
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             </div>
 
             {monteCarlo.bootstrap && (
@@ -311,6 +314,48 @@ export function AdvancedAnalyticsTab({ monteCarlo, activityHeatmap, kelly }: Pro
                     </p>
                   </div>
                 </div>
+                {monteCarlo.bootstrapChartRows.length > 0 && monteCarlo.bootstrapPathKeys.length > 0 && (
+                  <div className="mt-5">
+                    <p className="mb-1 text-xs font-medium text-slate-400">{t.mcBootstrapChartTitle}</p>
+                    <p className="mb-2 text-[11px] text-slate-500">{t.mcBootstrapChartHint}</p>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={monteCarlo.bootstrapChartRows}
+                          margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis
+                            dataKey="step"
+                            stroke="#64748b"
+                            tick={{ fill: "#94a3b8", fontSize: 11 }}
+                          />
+                          <YAxis stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#1e293b",
+                              border: "1px solid #334155",
+                              borderRadius: "12px",
+                              fontSize: 12,
+                            }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          {monteCarlo.bootstrapPathKeys.map((key, i) => (
+                            <Line
+                              key={key}
+                              type="monotone"
+                              dataKey={key}
+                              stroke={PATH_COLORS[i % PATH_COLORS.length]}
+                              dot={false}
+                              strokeWidth={1.2}
+                              name={t.bootstrapPathLabel(i + 1)}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>

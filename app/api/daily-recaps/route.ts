@@ -12,6 +12,11 @@ const upsertSchema = z.object({
   keptLossLimit: z.boolean(),
   setupsOnly: z.boolean(),
   noStopMoving: z.boolean(),
+  madePlan: z.boolean(),
+  followedPlan: z.boolean(),
+  preMarketJournal: z.boolean(),
+  keptMaxTrades: z.boolean(),
+  keptRiskRules: z.boolean(),
   lessonOfDay: z.string().max(10_000).optional().default(""),
 });
 
@@ -48,13 +53,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { date, keptLossLimit, setupsOnly, noStopMoving, lessonOfDay } = parsed.data;
+  const {
+    date,
+    keptLossLimit,
+    setupsOnly,
+    noStopMoving,
+    madePlan,
+    followedPlan,
+    preMarketJournal,
+    keptMaxTrades,
+    keptRiskRules,
+    lessonOfDay,
+  } = parsed.data;
   const dayStart = utcDayStartFromIso(date);
   if (!dayStart) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
   }
 
-  const disciplineScore = disciplineScoreFromChecklist(keptLossLimit, setupsOnly, noStopMoving);
+  const disciplineScore = disciplineScoreFromChecklist(
+    keptLossLimit,
+    setupsOnly,
+    noStopMoving,
+    madePlan,
+    followedPlan,
+    preMarketJournal,
+    keptMaxTrades,
+    keptRiskRules
+  );
 
   const bundle = await getUserDayTradingBundle(session.user.id, dayStart);
   const eff = bundle.sessionMetrics.efficiencyPerFeeUsd;
@@ -69,6 +94,11 @@ export async function POST(req: Request) {
       keptLossLimit,
       setupsOnly,
       noStopMoving,
+      madePlan,
+      followedPlan,
+      preMarketJournal,
+      keptMaxTrades,
+      keptRiskRules,
       disciplineScore,
       lessonOfDay,
       sessionEfficiency: eff,
@@ -78,6 +108,11 @@ export async function POST(req: Request) {
       keptLossLimit,
       setupsOnly,
       noStopMoving,
+      madePlan,
+      followedPlan,
+      preMarketJournal,
+      keptMaxTrades,
+      keptRiskRules,
       disciplineScore,
       lessonOfDay,
       sessionEfficiency: eff,

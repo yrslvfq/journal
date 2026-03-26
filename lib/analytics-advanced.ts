@@ -48,6 +48,8 @@ export type MonteCarloDto = {
   ddHistogram: { binLabel: string; count: number }[];
   chartRows: { step: number; [key: string]: number | string }[];
   pathKeys: string[];
+  bootstrapChartRows: { step: number; [key: string]: number | string }[];
+  bootstrapPathKeys: string[];
 };
 
 export type HeatmapCellDto = {
@@ -220,6 +222,50 @@ function computeBootstrapBlock(
   };
 }
 
+function computeBootstrapChart(
+  netPnls: number[],
+  pathCount: number,
+  rnd: () => number
+): { bootstrapChartRows: { step: number; [key: string]: number | string }[]; bootstrapPathKeys: string[] } {
+  const n = netPnls.length;
+  const bootstrapPathKeys = Array.from({ length: pathCount }, (_, i) => `bp${i}`);
+
+  const pathEquities: number[][] = [];
+  const finalsSeen = new Set<number>();
+  for (let p = 0; p < pathCount; p++) {
+    let cumulative: number[] = [];
+    let finalEq = 0;
+    let attempts = 0;
+    // Prefer distinct final equities across sample paths (not always possible, e.g. n==1).
+    do {
+      let eq = 0;
+      cumulative = [];
+      for (let i = 0; i < n; i++) {
+        // Bootstrap with replacement: each step samples net P&L independently.
+        const v = netPnls[Math.floor(rnd() * n)]!;
+        eq += v;
+        cumulative.push(eq);
+      }
+      finalEq = cumulative[cumulative.length - 1]!;
+      attempts++;
+    } while (n > 1 && finalsSeen.has(finalEq) && attempts < 200);
+    finalsSeen.add(finalEq);
+    pathEquities.push(cumulative);
+  }
+
+  const bootstrapChartRows: { step: number; [key: string]: number | string }[] = [];
+  for (let step = 0; step <= n; step++) {
+    const row: { step: number; [key: string]: number | string } = { step };
+    for (let p = 0; p < pathEquities.length; p++) {
+      const key = bootstrapPathKeys[p]!;
+      row[key] = step === 0 ? 0 : pathEquities[p]![step - 1]!;
+    }
+    bootstrapChartRows.push(row);
+  }
+
+  return { bootstrapChartRows, bootstrapPathKeys };
+}
+
 export function computeMonteCarlo(
   netPnlsChronological: number[],
   risksChronological: number[] | null,
@@ -242,6 +288,8 @@ export function computeMonteCarlo(
     simulatedAvgRMedian: null as number | null,
     ddHistogram: [] as { binLabel: string; count: number }[],
     bootstrap: null as MonteCarloBootstrapDto | null,
+    bootstrapChartRows: [] as { step: number; [key: string]: number | string }[],
+    bootstrapPathKeys: [] as string[],
   });
 
   if (n < 2) {
@@ -327,6 +375,11 @@ export function computeMonteCarlo(
 
   const ddHistogram = buildDdHistogram(maxDds, 12);
   const bootstrap = computeBootstrapBlock(netPnlsChronological, MONTE_CARLO_ITERATIONS, rnd);
+  const { bootstrapChartRows, bootstrapPathKeys: bootstrapChartPathKeys } = computeBootstrapChart(
+    netPnlsChronological,
+    CHART_PATHS,
+    rnd
+  );
 
   const chartRows: { step: number; [key: string]: number | string }[] = [];
   for (let step = 0; step <= n; step++) {
@@ -358,6 +411,8 @@ export function computeMonteCarlo(
     ddHistogram,
     chartRows,
     pathKeys,
+    bootstrapChartRows,
+    bootstrapPathKeys: bootstrapChartPathKeys,
   };
 }
 
@@ -499,11 +554,9 @@ export function computeKelly(
   };
 }
 
-export function disciplineScoreFromChecklist(
-  keptLossLimit: boolean,
-  setupsOnly: boolean,
-  noStopMoving: boolean
-): number {
-  const n = [keptLossLimit, setupsOnly, noStopMoving].filter(Boolean).length;
-  return Math.max(1, Math.round((n / 3) * 100));
+/** Equal-weight checklist score (1–100): checked items / total items. Minimum 1 when used. */
+export function disciplineScoreFromChecklist(...items: boolean[]): number {
+  if (items.length === 0) return 1;
+  const checked = items.filter(Boolean).length;
+  return Math.max(1, Math.round((checked / items.length) * 100));
 }

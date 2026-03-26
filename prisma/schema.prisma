@@ -34,6 +34,11 @@ model DailyRecap {
   keptLossLimit      Boolean  @default(false)
   setupsOnly         Boolean  @default(false)
   noStopMoving       Boolean  @default(false)
+  madePlan           Boolean  @default(false)
+  followedPlan       Boolean  @default(false)
+  preMarketJournal   Boolean  @default(false)
+  keptMaxTrades      Boolean  @default(false)
+  keptRiskRules      Boolean  @default(false)
   disciplineScore    Int
   lessonOfDay        String   @default("")
   sessionEfficiency  Float?

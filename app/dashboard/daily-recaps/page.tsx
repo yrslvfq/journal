@@ -60,6 +60,11 @@ export default function DailyRecapsPage() {
   const [keptLossLimit, setKeptLossLimit] = useState(false);
   const [setupsOnly, setSetupsOnly] = useState(false);
   const [noStopMoving, setNoStopMoving] = useState(false);
+  const [madePlan, setMadePlan] = useState(false);
+  const [followedPlan, setFollowedPlan] = useState(false);
+  const [preMarketJournal, setPreMarketJournal] = useState(false);
+  const [keptMaxTrades, setKeptMaxTrades] = useState(false);
+  const [keptRiskRules, setKeptRiskRules] = useState(false);
   const [lessonOfDay, setLessonOfDay] = useState("");
   const [dayPnl, setDayPnl] = useState<number | null>(null);
   const [tradesCount, setTradesCount] = useState(0);
@@ -73,8 +78,27 @@ export default function DailyRecapsPage() {
   const [sessionMetrics, setSessionMetrics] = useState<SessionMetrics | null>(null);
 
   const disciplineScore = useMemo(
-    () => disciplineScoreFromChecklist(keptLossLimit, setupsOnly, noStopMoving),
-    [keptLossLimit, setupsOnly, noStopMoving]
+    () =>
+      disciplineScoreFromChecklist(
+        keptLossLimit,
+        setupsOnly,
+        noStopMoving,
+        madePlan,
+        followedPlan,
+        preMarketJournal,
+        keptMaxTrades,
+        keptRiskRules
+      ),
+    [
+      keptLossLimit,
+      setupsOnly,
+      noStopMoving,
+      madePlan,
+      followedPlan,
+      preMarketJournal,
+      keptMaxTrades,
+      keptRiskRules,
+    ]
   );
 
   const applyDayPayload = useCallback((data: Record<string, unknown>) => {
@@ -99,11 +123,21 @@ export default function DailyRecapsPage() {
           setKeptLossLimit(!!data.recap.keptLossLimit);
           setSetupsOnly(!!data.recap.setupsOnly);
           setNoStopMoving(!!data.recap.noStopMoving);
+          setMadePlan(!!data.recap.madePlan);
+          setFollowedPlan(!!data.recap.followedPlan);
+          setPreMarketJournal(!!data.recap.preMarketJournal);
+          setKeptMaxTrades(!!data.recap.keptMaxTrades);
+          setKeptRiskRules(!!data.recap.keptRiskRules);
           setLessonOfDay(data.recap.lessonOfDay ?? "");
         } else {
           setKeptLossLimit(false);
           setSetupsOnly(false);
           setNoStopMoving(false);
+          setMadePlan(false);
+          setFollowedPlan(false);
+          setPreMarketJournal(false);
+          setKeptMaxTrades(false);
+          setKeptRiskRules(false);
           setLessonOfDay("");
         }
       } catch {
@@ -162,6 +196,11 @@ export default function DailyRecapsPage() {
           keptLossLimit,
           setupsOnly,
           noStopMoving,
+          madePlan,
+          followedPlan,
+          preMarketJournal,
+          keptMaxTrades,
+          keptRiskRules,
           lessonOfDay,
         }),
       });
@@ -315,6 +354,51 @@ export default function DailyRecapsPage() {
                 className="h-4 w-4 rounded border-slate-600"
               />
               {t.checklist3}
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={madePlan}
+                onChange={(e) => setMadePlan(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600"
+              />
+              {t.checklist4}
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={followedPlan}
+                onChange={(e) => setFollowedPlan(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600"
+              />
+              {t.checklist5}
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={preMarketJournal}
+                onChange={(e) => setPreMarketJournal(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600"
+              />
+              {t.checklist6}
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={keptMaxTrades}
+                onChange={(e) => setKeptMaxTrades(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600"
+              />
+              {t.checklist7}
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
+              <input
+                type="checkbox"
+                checked={keptRiskRules}
+                onChange={(e) => setKeptRiskRules(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600"
+              />
+              {t.checklist8}
             </label>
           </div>
 

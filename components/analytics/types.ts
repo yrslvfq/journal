@@ -72,6 +72,8 @@ export type MonteCarloDto = {
   ddHistogram: { binLabel: string; count: number }[];
   chartRows: { step: number; [key: string]: number | string }[];
   pathKeys: string[];
+  bootstrapChartRows: { step: number; [key: string]: number | string }[];
+  bootstrapPathKeys: string[];
 };
 
 export type HeatmapCellDto = {
