@@ -11,6 +11,5 @@ build:
 # db push при каждом старте может затягивать поднятие порта → пробы/рестарты и SIGTERM.
 # --skip-generate: клиент уже собран на этапе build.
 run:
-  command: npx prisma db push --skip-generate && npm run start
+  command: npm run start:amvera
   containerPort: 3000
-  persistenceMount: /data

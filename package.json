@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start -H 0.0.0.0",
+    "build": "prisma generate && next build",
+    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "npx prisma db seed"
+    "db:seed": "npx prisma db seed",
+    "start:amvera": "prisma db push --skip-generate && next start -H 0.0.0.0 -p ${PORT:-3000}"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -18,7 +18,7 @@
 
 | Переменная | Значение | Описание |
 |------------|----------|----------|
-| `DATABASE_URL` | `file:/data/journal.db` | Путь к SQLite в постоянном хранилище |
+| `DATABASE_URL` | `postgresql://USER:PASSWORD@HOST:5432/DB?schema=public` | Строка подключения PostgreSQL |
 | `UPLOADS_DIR` | `/data/uploads` | Папка для скриншотов и изображений (должна быть в /data) |
 | `NEXTAUTH_SECRET` | случайная строка | Сгенерируйте: `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | `https://ваш-проект.amvera.ru` | URL приложения после деплоя |
@@ -30,8 +30,8 @@
 
 1. После настройки нажмите «Завершить»
 2. Amvera выполнит: `npm install` → `prisma generate` → `npm run build`
-3. При запуске: `prisma db push` (создаст схему БД) → `npm start`
-4. Папка `/data` монтируется как постоянное хранилище — БД и загрузки сохраняются при пересборках
+3. При запуске: `prisma db push --skip-generate` (создаст/обновит схему в PostgreSQL) → `npm start`
+4. Папка `/data` нужна только для загрузок (`UPLOADS_DIR=/data/uploads`)
 
 ## 5. Обновление NEXTAUTH_URL
 
@@ -45,13 +45,11 @@
 
 ## Если в логах `SIGTERM` / `next start` обрывается
 
-1. **Проверьте переменные:** `DATABASE_URL=file:/data/journal.db`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`. Без БД на `/data` или с ошибкой `db push` процесс может не дойти до прослушивания порта.
+1. **Проверьте переменные:** `DATABASE_URL=postgresql://...`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`. При ошибке подключения к PostgreSQL процесс может не дойти до прослушивания порта.
 2. **Лог «Лог приложения»** в Amvera: успевает ли появиться строка вроде `Ready on` / `started server` до рестарта.
 3. **Долгий старт:** `prisma db push` перед `npm run start` удлиняет старт. В `amvera.yml` используется `db push --skip-generate` (генерация уже в `build`). Если рестарты остаются — в настройках проекта можно добавить [Kubernetes startup/liveness probe](https://docs.amvera.ru/general/k8sprobe.html) с большим `initialDelaySeconds` (например 60–120).
 4. **Мало RAM на тарифе** — OOM даёт внешнее завершение процесса; попробуйте повысить тариф или включить [standalone](https://nextjs.org/docs/app/api-reference/next-config-js/output)-сборку позже.
 
 ## Локальная разработка
 
-Без переменных `DATABASE_URL` и `UPLOADS_DIR` приложение использует:
-- БД: `prisma/dev.db`
-- Загрузки: `public/uploads/`
+Для локальной разработки используйте отдельный `DATABASE_URL` на локальный PostgreSQL и `UPLOADS_DIR=public/uploads`.
